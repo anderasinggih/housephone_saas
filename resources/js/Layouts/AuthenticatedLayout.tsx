@@ -56,8 +56,22 @@ export default function Authenticated({
         }
     }, [theme]);
 
+    useEffect(() => {
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const handleChange = (e: MediaQueryListEvent) => {
+            const saved = localStorage.getItem('theme');
+            if (!saved) {
+                setTheme(e.matches ? 'dark' : 'light');
+            }
+        };
+        mediaQuery.addEventListener('change', handleChange);
+        return () => mediaQuery.removeEventListener('change', handleChange);
+    }, []);
+
     const toggleTheme = () => {
-        setTheme(theme === 'dark' ? 'light' : 'dark');
+        const newTheme = theme === 'dark' ? 'light' : 'dark';
+        setTheme(newTheme);
+        localStorage.setItem('theme', newTheme);
     };
 
     const checkedInToday = (usePage().props.auth as any).checkedInToday;
@@ -350,12 +364,21 @@ export default function Authenticated({
                     <div className="sm:hidden fixed bottom-24 left-4 right-4 z-40 p-5 rounded-2xl bg-card border border-border shadow-2xl max-h-[70vh] overflow-y-auto animate-in slide-in-from-bottom-5 duration-300">
                         <div className="flex justify-between items-center mb-4 pb-2 border-b border-border">
                             <h3 className="font-bold text-lg text-foreground">Menu</h3>
-                            <button 
-                                onClick={toggleMobileMore}
-                                className="p-1 rounded-full hover:bg-muted text-muted-foreground"
-                            >
-                                <X className="h-5 w-5" />
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={toggleTheme}
+                                    className="p-2 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200"
+                                    title="Toggle Theme"
+                                >
+                                    {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+                                </button>
+                                <button 
+                                    onClick={toggleMobileMore}
+                                    className="p-1 rounded-full hover:bg-muted text-muted-foreground"
+                                >
+                                    <X className="h-5 w-5" />
+                                </button>
+                            </div>
                         </div>
 
                         {!showMobileSettings ? (
