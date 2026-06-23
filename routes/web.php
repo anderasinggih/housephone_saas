@@ -34,6 +34,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/stocks/transfer', [StockController::class, 'transfer'])->name('stocks.transfer');
     Route::post('/stocks/transfer/{transfer}/approve', [StockController::class, 'approveTransfer'])->name('stocks.transfer.approve');
     Route::put('/stocks/{stock}', [StockController::class, 'update'])->name('stocks.update');
+    Route::post('/stocks/{stock}/restore', [StockController::class, 'restore'])->name('stocks.restore');
     Route::delete('/stocks/{stock}', [StockController::class, 'destroy'])->name('stocks.destroy');
     Route::post('/parameters/value', [StockController::class, 'storeParameterValue'])->name('parameters.value.store');
     Route::post('/parameters/value/{value}/toggle', [StockController::class, 'toggleParameterValue'])->name('parameters.value.toggle');

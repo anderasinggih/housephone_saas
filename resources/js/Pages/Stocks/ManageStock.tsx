@@ -53,6 +53,7 @@ interface StockItem {
     qty: number;
     status: 'available' | 'transit' | 'sold';
     created_at?: string;
+    deleted_at?: string | null;
     store?: { name: string };
     brand?: { value: string };
     color?: { value: string };
@@ -94,12 +95,21 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
     const isSuperAdmin = authUser.role === 'superadmin';
     const [storeFilterId, setStoreFilterId] = useState(filters?.store_id || '');
     const [isAddingNewStock, setIsAddingNewStock] = useState(false);
+    const [isEditingStock, setIsEditingStock] = useState(false);
+    const [trashFilter, setTrashFilter] = useState<'active' | 'trash'>('active');
     const [selectedStockDetail, setSelectedStockDetail] = useState<StockItem | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
 
     const uniqueProductNames = Array.from(new Set(stocks.map(s => s.name).filter(Boolean)));
 
     const filteredStocks = stocks.filter(item => {
+        // Filter by trash / active
+        if (trashFilter === 'trash') {
+            if (!item.deleted_at) return false;
+        } else {
+            if (item.deleted_at) return false;
+        }
+
         const matchesSearch = 
             item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
             (item.serial_number && item.serial_number.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -133,8 +143,6 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
         qty: 1
     });
 
-    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    
     const editForm = useForm({
         store_id: '' as string | number,
         category: 'iphone' as 'iphone' | 'android' | 'accessories' | 'extra',
@@ -175,7 +183,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
             qty: stock.qty || 1,
             status: stock.status || 'available'
         });
-        setIsEditModalOpen(true);
+        setIsEditingStock(true);
     };
 
     const submitEdit = (e: React.FormEvent) => {
@@ -183,7 +191,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
         if (!selectedStockDetail) return;
         editForm.put(route('stocks.update', selectedStockDetail.id), {
             onSuccess: () => {
-                setIsEditModalOpen(false);
+                setIsEditingStock(false);
                 setSelectedStockDetail(null);
                 alert('Stok unit berhasil diperbarui!');
             }
@@ -191,11 +199,22 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
     };
 
     const handleDeleteStock = (stockId: number) => {
-        if (confirm('Apakah Anda yakin ingin menghapus stok unit ini secara permanen dari sistem?')) {
+        if (confirm('Apakah Anda yakin ingin menghapus stok unit ini? Unit akan dimasukkan ke tempat sampah (Soft Delete).')) {
             router.delete(route('stocks.destroy', stockId), {
                 onSuccess: () => {
                     setSelectedStockDetail(null);
-                    alert('Stok unit berhasil dihapus!');
+                    alert('Stok unit berhasil dimasukkan ke tempat sampah!');
+                }
+            });
+        }
+    };
+
+    const handleRestoreStock = (stockId: number) => {
+        if (confirm('Apakah Anda yakin ingin memulihkan unit stok ini dari tempat sampah?')) {
+            router.post(route('stocks.restore', stockId), {}, {
+                onSuccess: () => {
+                    setSelectedStockDetail(null);
+                    alert('Stok unit berhasil dipulihkan!');
                 }
             });
         }
@@ -262,7 +281,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
             header={
                 <div className="flex flex-col justify-end gap-3 sm:flex-row sm:items-center w-full">
                     <div className="flex flex-wrap items-center gap-2 ml-auto w-full sm:w-auto">
-                        {!isAddingNewStock && (
+                        {!isAddingNewStock && !isEditingStock && (
                             <div className="relative w-full sm:w-60">
                                 <input
                                     type="text"
@@ -273,7 +292,17 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                 />
                             </div>
                         )}
-                        {isSuperAdmin && (
+                        {isSuperAdmin && !isAddingNewStock && !isEditingStock && (
+                            <select
+                                value={trashFilter}
+                                onChange={(e) => setTrashFilter(e.target.value as any)}
+                                className="rounded-xl border border-input bg-card px-4 py-2 text-sm font-bold text-foreground shadow-sm focus:border-indigo-500 focus:outline-none dark:bg-background"
+                            >
+                                <option value="active">Unit Aktif</option>
+                                <option value="trash">Tempat Sampah (Trash)</option>
+                            </select>
+                        )}
+                        {isSuperAdmin && !isAddingNewStock && !isEditingStock && (
                             <select
                                 value={storeFilterId}
                                 onChange={(e) => {
@@ -289,7 +318,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                             </select>
                         )}
                         
-                        {!isAddingNewStock ? (
+                        {!isAddingNewStock && !isEditingStock ? (
                             <button
                                 onClick={() => setIsAddingNewStock(true)}
                                 className="flex items-center justify-center rounded-xl bg-indigo-600 px-3 py-2 text-white hover:bg-indigo-700 transition shadow-md whitespace-nowrap shrink-0"
@@ -299,7 +328,10 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                             </button>
                         ) : (
                             <button
-                                onClick={() => setIsAddingNewStock(false)}
+                                onClick={() => {
+                                    setIsAddingNewStock(false);
+                                    setIsEditingStock(false);
+                                }}
                                 className="flex items-center justify-center rounded-xl border border-input bg-card px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted transition shadow-sm whitespace-nowrap shrink-0 dark:bg-background"
                             >
                                 Kembali
@@ -315,7 +347,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                 <div className="mx-auto max-w-none px-4 sm:px-6 lg:px-8 space-y-8">
 
                     {/* TAB 1: LIST STOCKS */}
-                    {!isAddingNewStock ? (
+                    {!isAddingNewStock && !isEditingStock ? (
                         <div className="w-full flex flex-col lg:flex-row gap-6 items-stretch lg:items-start">
                                                {/* Table Column */}
                             <div className={`rounded-none sm:rounded-lg border-x-0 sm:border border-y sm:border-y-0 border-border bg-transparent sm:bg-card shadow-none sm:shadow-sm text-card-foreground -mx-4 sm:mx-0 w-[calc(100%+2rem)] sm:w-full transition-all duration-300 ${
@@ -428,13 +460,15 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                             <td className="py-4 px-3 whitespace-nowrap text-left">{buyerName}</td>
                                                             <td className="py-4 text-right px-3 whitespace-nowrap">
                                                                 <span className={`inline-flex rounded px-2 py-0.5 text-[10px] font-bold uppercase ${
-                                                                    item.status === 'available' 
-                                                                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' 
-                                                                        : item.status === 'transit' 
-                                                                            ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
-                                                                            : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                                                                    item.deleted_at
+                                                                        ? 'bg-gray-500/10 text-gray-600 dark:text-gray-400 border border-gray-500/20'
+                                                                        : item.status === 'available' 
+                                                                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' 
+                                                                            : item.status === 'transit' 
+                                                                                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                                                                                : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
                                                                 }`}>
-                                                                    {item.status}
+                                                                    {item.deleted_at ? 'TRASH' : item.status}
                                                                 </span>
                                                             </td>
                                                         </tr>
@@ -475,15 +509,21 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                             <span className="inline-flex rounded px-2 py-0.5 text-[10px] font-bold uppercase bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
                                                 {selectedStockDetail.type}
                                             </span>
-                                            <span className={`inline-flex rounded px-2 py-0.5 text-[10px] font-bold uppercase ${
-                                                selectedStockDetail.status === 'available' 
-                                                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' 
-                                                    : selectedStockDetail.status === 'transit' 
-                                                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
-                                                        : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
-                                            }`}>
-                                                {selectedStockDetail.status}
-                                            </span>
+                                            {selectedStockDetail.deleted_at ? (
+                                                <span className="inline-flex rounded px-2 py-0.5 text-[10px] font-bold uppercase bg-gray-500/10 text-gray-600 dark:text-gray-400 border border-gray-500/20">
+                                                    TRASH / TERHAPUS
+                                                </span>
+                                            ) : (
+                                                <span className={`inline-flex rounded px-2 py-0.5 text-[10px] font-bold uppercase ${
+                                                    selectedStockDetail.status === 'available' 
+                                                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' 
+                                                        : selectedStockDetail.status === 'transit' 
+                                                            ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                                                            : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                                                }`}>
+                                                    {selectedStockDetail.status}
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
 
@@ -639,27 +679,39 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                     )}
                                     {isSuperAdmin && (
                                         <div className="flex gap-3 pt-4 border-t border-border dark:border-input">
-                                            <button
-                                                type="button"
-                                                onClick={() => openEditModal(selectedStockDetail)}
-                                                className="flex-1 rounded-xl bg-indigo-600 py-2.5 text-xs font-semibold text-white hover:bg-indigo-700 transition"
-                                            >
-                                                Edit Unit
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleDeleteStock(selectedStockDetail.id)}
-                                                className="flex-1 rounded-xl bg-rose-600 py-2.5 text-xs font-semibold text-white hover:bg-rose-700 transition"
-                                            >
-                                                Hapus Unit
-                                            </button>
+                                            {selectedStockDetail.deleted_at ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRestoreStock(selectedStockDetail.id)}
+                                                    className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-xs font-semibold text-white hover:bg-emerald-700 transition"
+                                                >
+                                                    Restore Unit
+                                                </button>
+                                            ) : (
+                                                <>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openEditModal(selectedStockDetail)}
+                                                        className="flex-1 rounded-xl bg-indigo-600 py-2.5 text-xs font-semibold text-white hover:bg-indigo-700 transition"
+                                                    >
+                                                        Edit Unit
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDeleteStock(selectedStockDetail.id)}
+                                                        className="flex-1 rounded-xl bg-rose-600 py-2.5 text-xs font-semibold text-white hover:bg-rose-700 transition"
+                                                    >
+                                                        Hapus Unit
+                                                    </button>
+                                                </>
+                                            )}
                                         </div>
                                     )}
                                 </div>
                             )}
 
                         </div>
-                    ) : (
+                    ) : isAddingNewStock ? (
                         <div className="rounded-none sm:rounded-lg border-x-0 sm:border border-y-0 sm:border-y bg-transparent sm:bg-card p-0 sm:p-6 shadow-none sm:shadow-sm text-card-foreground">
                             <h3 className="text-lg font-semibold text-foreground mb-6">Tambah Stok Unit Baru</h3>
                             
@@ -890,229 +942,225 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                 </div>
                             </form>
                         </div>
-                    )}
+                    ) : (
+                        <div className="rounded-none sm:rounded-lg border-x-0 sm:border border-y-0 sm:border-y bg-transparent sm:bg-card p-0 sm:p-6 shadow-none sm:shadow-sm text-card-foreground">
+                            <h3 className="text-lg font-semibold text-foreground mb-6">Edit Unit Stok</h3>
 
-                    {/* Edit Stock Modal */}
-                    {isEditModalOpen && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 overflow-y-auto">
-                            <div className="w-full max-w-2xl rounded-none sm:rounded-lg bg-background sm:bg-card p-4 sm:p-6 shadow-none sm:shadow-sm dark:bg-background border-0 sm:border border-border dark:border-input my-0 sm:my-8 min-h-screen sm:min-h-0 flex flex-col justify-between sm:justify-start">
-                                <div className="flex justify-between items-center pb-4 border-b border-border dark:border-input">
-                                    <h4 className="text-lg font-semibold text-foreground">Edit Unit Stok</h4>
-                                    <button onClick={() => setIsEditModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1.5 hover:bg-muted rounded-lg text-lg transition-colors">✕</button>
-                                </div>
-
-                                <form onSubmit={submitEdit} className="space-y-6 pt-4 max-h-[85vh] sm:max-h-[70vh] overflow-y-auto pr-2">
-                                    {/* Section 1: Lokasi & Kategori */}
-                                    <div className="p-0 sm:p-4 rounded-none sm:rounded-xl border-0 sm:border border-transparent sm:border-border dark:sm:border-input bg-transparent sm:bg-muted/20 space-y-4">
-                                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                                            <div>
-                                                <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Pilih Cabang Toko</label>
-                                                <select
-                                                    required
-                                                    value={editForm.data.store_id}
-                                                    onChange={e => editForm.setData('store_id', e.target.value)}
-                                                    className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
-                                                >
-                                                    {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Kategori Barang</label>
-                                                <select
-                                                    value={editForm.data.category}
-                                                    onChange={e => editForm.setData('category', e.target.value as any)}
-                                                    className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
-                                                >
-                                                    <option value="iphone">iPhone</option>
-                                                    <option value="android">Android</option>
-                                                    <option value="accessories">Aksesoris (Bulk)</option>
-                                                    <option value="extra">Jasa / Add-on (Layanan)</option>
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Kondisi Barang</label>
-                                                <select
-                                                    value={editForm.data.type}
-                                                    onChange={e => editForm.setData('type', e.target.value as any)}
-                                                    className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
-                                                >
-                                                    <option value="new">Baru (New)</option>
-                                                    <option value="second">Bekas (Second)</option>
-                                                </select>
-                                            </div>
+                            <form onSubmit={submitEdit} className="space-y-6">
+                                {/* Section 1: Lokasi & Kategori */}
+                                <div className="p-0 sm:p-4 rounded-none sm:rounded-xl border-0 sm:border border-transparent sm:border-border dark:sm:border-input bg-transparent sm:bg-muted/20 space-y-4">
+                                    <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">1. Lokasi & Kategori Unit</h4>
+                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                                        <div>
+                                            <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Pilih Cabang Toko</label>
+                                            <select
+                                                required
+                                                value={editForm.data.store_id}
+                                                onChange={e => editForm.setData('store_id', e.target.value)}
+                                                className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
+                                            >
+                                                {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Kategori Barang</label>
+                                            <select
+                                                value={editForm.data.category}
+                                                onChange={e => editForm.setData('category', e.target.value as any)}
+                                                className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
+                                            >
+                                                <option value="iphone">iPhone</option>
+                                                <option value="android">Android</option>
+                                                <option value="accessories">Aksesoris (Bulk)</option>
+                                                <option value="extra">Jasa / Add-on (Layanan)</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Kondisi Barang</label>
+                                            <select
+                                                value={editForm.data.type}
+                                                onChange={e => editForm.setData('type', e.target.value as any)}
+                                                className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
+                                            >
+                                                <option value="new">Baru (New)</option>
+                                                <option value="second">Bekas (Second)</option>
+                                            </select>
                                         </div>
                                     </div>
-                                    {/* Section 2: Spesifikasi & Identitas */}
-                                    <div className="p-0 sm:p-4 rounded-none sm:rounded-xl border-0 sm:border border-transparent sm:border-border dark:sm:border-input bg-transparent sm:bg-muted/20 space-y-4">
-                                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                                            <div className="sm:col-span-2">
-                                                <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Nama Produk / Jasa</label>
-                                                <input
-                                                    type="text"
-                                                    required
-                                                    list="product-names-list"
-                                                    value={editForm.data.name}
-                                                    onChange={e => editForm.setData('name', e.target.value)}
-                                                    className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
-                                                    placeholder="Contoh: iPhone 15 Pro Max"
-                                                />
-                                            </div>
+                                </div>
 
-                                            {editForm.data.category !== 'accessories' && editForm.data.category !== 'extra' && (
-                                                <>
-                                                    <div>
-                                                        <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Warna</label>
-                                                        <select value={editForm.data.color_id} onChange={e => editForm.setData('color_id', e.target.value)} className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background">
-                                                            <option value="">-- Pilih Warna --</option>
-                                                            {getParamValues('warna').map(o => <option key={o.id} value={o.id}>{o.value}</option>)}
-                                                        </select>
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Kapasitas Memori</label>
-                                                        <select value={editForm.data.memory_id} onChange={e => editForm.setData('memory_id', e.target.value)} className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background">
-                                                            <option value="">-- Pilih Memori --</option>
-                                                            {getParamValues('kapasitas memori').map(o => <option key={o.id} value={o.id}>{o.value}</option>)}
-                                                        </select>
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Tipe Lisensi</label>
-                                                        <select value={editForm.data.license_id} onChange={e => editForm.setData('license_id', e.target.value)} className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background">
-                                                            <option value="">-- Pilih Lisensi --</option>
-                                                            {getParamValues('tipe lisensi').map(o => <option key={o.id} value={o.id}>{o.value}</option>)}
-                                                        </select>
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Serial Number (SN)</label>
-                                                        <input
-                                                            type="text"
-                                                            value={editForm.data.serial_number}
-                                                            onChange={e => editForm.setData('serial_number', e.target.value.toUpperCase())}
-                                                            className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold uppercase dark:border-input dark:bg-background"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-xs font-bold uppercase text-gray-400 mb-1">IMEI</label>
-                                                        <input
-                                                            type="text"
-                                                            inputMode="numeric"
-                                                            value={editForm.data.imei_1}
-                                                            onChange={e => editForm.setData('imei_1', e.target.value)}
-                                                            onKeyDown={e => {
-                                                                if (e.key === 'Enter') {
-                                                                    e.preventDefault();
-                                                                }
-                                                            }}
-                                                            className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
-                                                        />
-                                                    </div>
-                                                </>
-                                            )}
+                                {/* Section 2: Spesifikasi & Identitas */}
+                                <div className="p-0 sm:p-4 rounded-none sm:rounded-xl border-0 sm:border border-transparent sm:border-border dark:sm:border-input bg-transparent sm:bg-muted/20 space-y-4">
+                                    <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">2. Detail Spesifikasi & Identitas Barang</h4>
+                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                                        <div className="sm:col-span-2">
+                                            <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Nama Produk / Jasa</label>
+                                            <input
+                                                type="text"
+                                                required
+                                                list="product-names-list"
+                                                value={editForm.data.name}
+                                                onChange={e => editForm.setData('name', e.target.value)}
+                                                className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
+                                                placeholder="Contoh: iPhone 15 Pro Max"
+                                            />
+                                        </div>
 
-                                            {(editForm.data.category === 'accessories' || editForm.data.category === 'extra') && (
+                                        {editForm.data.category !== 'accessories' && editForm.data.category !== 'extra' && (
+                                            <>
                                                 <div>
-                                                    <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Warna (Opsional)</label>
-                                                    <select
-                                                        value={editForm.data.color_id}
-                                                        onChange={e => editForm.setData('color_id', e.target.value)}
-                                                        className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
-                                                    >
+                                                    <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Warna</label>
+                                                    <select value={editForm.data.color_id} onChange={e => editForm.setData('color_id', e.target.value)} className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background">
                                                         <option value="">-- Pilih Warna --</option>
                                                         {getParamValues('warna').map(o => <option key={o.id} value={o.id}>{o.value}</option>)}
                                                     </select>
                                                 </div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Section 3: Harga & Finansial */}
-                                    <div className="p-0 sm:p-4 rounded-none sm:rounded-xl border-0 sm:border border-transparent sm:border-border dark:sm:border-input bg-transparent sm:bg-muted/20 space-y-4">
-                                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                                            <div className="lg:col-span-2">
-                                                <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Supplier / Pengirim</label>
-                                                <input
-                                                    type="text"
-                                                    value={editForm.data.supplier}
-                                                    onChange={e => editForm.setData('supplier', e.target.value)}
-                                                    className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Garansi Toko (Hari)</label>
-                                                <input
-                                                    type="number"
-                                                    required
-                                                    inputMode="numeric"
-                                                    value={editForm.data.warranty_duration_days}
-                                                    onChange={e => editForm.setData('warranty_duration_days', parseInt(e.target.value) || 0)}
-                                                    className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
-                                                />
-                                            </div>
-                                            {editForm.data.category === 'accessories' && (
                                                 <div>
-                                                    <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Quantity (Stok)</label>
+                                                    <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Kapasitas Memori</label>
+                                                    <select value={editForm.data.memory_id} onChange={e => editForm.setData('memory_id', e.target.value)} className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background">
+                                                        <option value="">-- Pilih Memori --</option>
+                                                        {getParamValues('kapasitas memori').map(o => <option key={o.id} value={o.id}>{o.value}</option>)}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Tipe Lisensi</label>
+                                                    <select value={editForm.data.license_id} onChange={e => editForm.setData('license_id', e.target.value)} className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background">
+                                                        <option value="">-- Pilih Lisensi --</option>
+                                                        {getParamValues('tipe lisensi').map(o => <option key={o.id} value={o.id}>{o.value}</option>)}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Serial Number (SN)</label>
                                                     <input
-                                                        type="number"
-                                                        required
-                                                        min={1}
+                                                        type="text"
+                                                        value={editForm.data.serial_number}
+                                                        onChange={e => editForm.setData('serial_number', e.target.value.toUpperCase())}
+                                                        className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold uppercase dark:border-input dark:bg-background"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold uppercase text-gray-400 mb-1">IMEI</label>
+                                                    <input
+                                                        type="text"
                                                         inputMode="numeric"
-                                                        value={editForm.data.qty}
-                                                        onChange={e => editForm.setData('qty', parseInt(e.target.value) || 1)}
+                                                        value={editForm.data.imei_1}
+                                                        onChange={e => editForm.setData('imei_1', e.target.value)}
+                                                        onKeyDown={e => {
+                                                            if (e.key === 'Enter') {
+                                                                e.preventDefault();
+                                                            }
+                                                        }}
                                                         className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
                                                     />
                                                 </div>
-                                            )}
+                                            </>
+                                        )}
+
+                                        {(editForm.data.category === 'accessories' || editForm.data.category === 'extra') && (
                                             <div>
-                                                <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Status Unit</label>
+                                                <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Warna (Opsional)</label>
                                                 <select
-                                                    value={editForm.data.status}
-                                                    onChange={e => editForm.setData('status', e.target.value as any)}
+                                                    value={editForm.data.color_id}
+                                                    onChange={e => editForm.setData('color_id', e.target.value)}
                                                     className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
                                                 >
-                                                    <option value="available">Tersedia (Available)</option>
-                                                    <option value="transit">Transit / Usulan Mutasi</option>
-                                                    <option value="sold">Terjual (Sold)</option>
+                                                    <option value="">-- Pilih Warna --</option>
+                                                    {getParamValues('warna').map(o => <option key={o.id} value={o.id}>{o.value}</option>)}
                                                 </select>
                                             </div>
-                                        </div>
+                                        )}
+                                    </div>
+                                </div>
 
-                                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 pt-2">
+                                {/* Section 3: Harga & Finansial */}
+                                <div className="p-0 sm:p-4 rounded-none sm:rounded-xl border-0 sm:border border-transparent sm:border-border dark:sm:border-input bg-transparent sm:bg-muted/20 space-y-4">
+                                    <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">3. Finansial, Garansi & Distribusi</h4>
+                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                                        <div className="lg:col-span-2">
+                                            <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Supplier / Pengirim</label>
+                                            <input
+                                                type="text"
+                                                value={editForm.data.supplier}
+                                                onChange={e => editForm.setData('supplier', e.target.value)}
+                                                className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Garansi Toko (Hari)</label>
+                                            <input
+                                                type="number"
+                                                required
+                                                inputMode="numeric"
+                                                value={editForm.data.warranty_duration_days}
+                                                onChange={e => editForm.setData('warranty_duration_days', parseInt(e.target.value) || 0)}
+                                                className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
+                                            />
+                                        </div>
+                                        {editForm.data.category === 'accessories' && (
                                             <div>
-                                                <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Harga Beli (HPP)</label>
+                                                <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Quantity (Stok)</label>
                                                 <input
                                                     type="number"
                                                     required
-                                                    min={0}
+                                                    min={1}
                                                     inputMode="numeric"
-                                                    value={editForm.data.buy_price}
-                                                    onChange={e => editForm.setData('buy_price', parseFloat(e.target.value) || 0)}
+                                                    value={editForm.data.qty}
+                                                    onChange={e => editForm.setData('qty', parseInt(e.target.value) || 1)}
                                                     className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
                                                 />
                                             </div>
-                                            <div>
-                                                <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Harga Jual Standar</label>
-                                                <input
-                                                    type="number"
-                                                    required
-                                                    min={0}
-                                                    inputMode="numeric"
-                                                    value={editForm.data.sell_price}
-                                                    onChange={e => editForm.setData('sell_price', parseFloat(e.target.value) || 0)}
-                                                    className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
-                                                />
-                                            </div>
+                                        )}
+                                        <div>
+                                            <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Status Unit</label>
+                                            <select
+                                                value={editForm.data.status}
+                                                onChange={e => editForm.setData('status', e.target.value as any)}
+                                                className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
+                                            >
+                                                <option value="available">Tersedia (Available)</option>
+                                                <option value="transit">Transit / Usulan Mutasi</option>
+                                                <option value="sold">Terjual (Sold)</option>
+                                            </select>
                                         </div>
                                     </div>
 
-                                    <div className="flex gap-3 pt-4 border-t border-border dark:border-input">
-                                        <button type="button" onClick={() => setIsEditModalOpen(false)} className="flex-1 rounded-xl border border-input py-2.5 text-xs font-semibold text-gray-500 hover:bg-muted dark:border-input">
-                                            Batal
-                                        </button>
-                                        <button type="submit" disabled={editForm.processing} className="flex-1 rounded-xl bg-indigo-600 py-2.5 text-xs font-semibold text-white hover:bg-indigo-700 transition">
-                                            {editForm.processing ? 'Menyimpan...' : 'Simpan Perubahan'}
-                                        </button>
+                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 pt-2">
+                                        <div>
+                                            <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Harga Beli (HPP)</label>
+                                            <input
+                                                type="number"
+                                                required
+                                                min={0}
+                                                inputMode="numeric"
+                                                value={editForm.data.buy_price}
+                                                onChange={e => editForm.setData('buy_price', parseFloat(e.target.value) || 0)}
+                                                className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Harga Jual Standar</label>
+                                            <input
+                                                type="number"
+                                                required
+                                                min={0}
+                                                inputMode="numeric"
+                                                value={editForm.data.sell_price}
+                                                onChange={e => editForm.setData('sell_price', parseFloat(e.target.value) || 0)}
+                                                className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
+                                            />
+                                        </div>
                                     </div>
-                                </form>
-                            </div>
+                                </div>
+
+                                <div className="flex gap-3 pt-4 border-t border-border dark:border-input justify-end">
+                                    <button type="button" onClick={() => setIsEditingStock(false)} className="rounded-xl border border-input px-6 py-3 text-xs font-semibold text-gray-500 hover:bg-muted dark:border-input">
+                                        Batal
+                                    </button>
+                                    <button type="submit" disabled={editForm.processing} className="rounded-xl bg-indigo-600 px-6 py-3 text-xs font-semibold text-white hover:bg-indigo-700 transition">
+                                        {editForm.processing ? 'Menyimpan...' : 'Simpan Perubahan'}
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     )}
 

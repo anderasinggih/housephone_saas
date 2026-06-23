@@ -77,7 +77,7 @@ class StockController extends Controller
             $storeId = $request->input('store_id');
         }
 
-        $stocks = Stock::with([
+        $stocks = Stock::withTrashed()->with([
             'store',
             'brand',
             'color',
@@ -346,6 +346,20 @@ class StockController extends Controller
         ActivityLog::log('stock_updated', Stock::class, $stock->id, $validated, $oldValues);
 
         return redirect()->back()->with('success', 'Stok unit berhasil diperbarui.');
+    }
+
+    public function restore(Request $request, $id): RedirectResponse
+    {
+        if ($request->user()->role !== 'superadmin') {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $stock = Stock::withTrashed()->findOrFail($id);
+        $stock->restore();
+
+        ActivityLog::log('stock_restored', Stock::class, $stock->id, $stock->toArray());
+
+        return redirect()->back()->with('success', 'Stok unit berhasil dikembalikan.');
     }
 
     public function destroy(Request $request, Stock $stock): RedirectResponse
