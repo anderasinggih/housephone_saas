@@ -846,7 +846,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                         )}
                                     </div>
 
-                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 pt-2">
+                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 pt-2">
                                         <div>
                                             <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Harga Modal Beli (HPP)</label>
                                             <input
@@ -874,19 +874,6 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                 className={`w-full rounded-xl border px-3.5 py-2 text-sm font-bold dark:bg-background ${singleForm.errors.sell_price ? 'border-rose-400' : 'border-input dark:border-input'}`}
                                             />
                                             {singleForm.errors.sell_price && <p className="mt-1 text-xs text-rose-500">{singleForm.errors.sell_price}</p>}
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Harga Jual Reseller (Opsional)</label>
-                                            <input
-                                                type="number"
-                                                min={0}
-                                                inputMode="numeric"
-                                                value={singleForm.data.sell_price_reseller ?? ''}
-                                                onChange={e => singleForm.setData('sell_price_reseller', e.target.value === '' ? '' : parseFloat(e.target.value))}
-                                                placeholder="Masukkan harga reseller"
-                                                className={`w-full rounded-xl border px-3.5 py-2 text-sm font-bold dark:bg-background ${singleForm.errors.sell_price_reseller ? 'border-rose-400' : 'border-input dark:border-input'}`}
-                                            />
-                                            {singleForm.errors.sell_price_reseller && <p className="mt-1 text-xs text-rose-500">{singleForm.errors.sell_price_reseller}</p>}
                                         </div>
                                     </div>
                                 </div>
@@ -1086,7 +1073,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 pt-2">
+                                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 pt-2">
                                             <div>
                                                 <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Harga Beli (HPP)</label>
                                                 <input
@@ -1108,17 +1095,6 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                     inputMode="numeric"
                                                     value={editForm.data.sell_price}
                                                     onChange={e => editForm.setData('sell_price', parseFloat(e.target.value) || 0)}
-                                                    className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Harga Reseller (Opsional)</label>
-                                                <input
-                                                    type="number"
-                                                    min={0}
-                                                    inputMode="numeric"
-                                                    value={editForm.data.sell_price_reseller}
-                                                    onChange={e => editForm.setData('sell_price_reseller', e.target.value === '' ? '' : parseFloat(e.target.value))}
                                                     className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
                                                 />
                                             </div>
