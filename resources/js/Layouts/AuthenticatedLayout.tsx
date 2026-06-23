@@ -81,6 +81,7 @@ export default function Authenticated({
             { name: 'Selling', href: route('selling.index'), icon: Smartphone, current: route().current('selling.index') },
             { name: 'Dashboard', href: route('dashboard'), icon: LayoutDashboard, current: route().current('dashboard') },
             { name: 'Sale Data', href: route('sale-data.index'), icon: Layers, current: route().current('sale-data.index') },
+            { name: 'Activities', href: route('timeline.index'), icon: Activity, current: route().current('timeline.index') },
         ];
     };
 
@@ -92,7 +93,6 @@ export default function Authenticated({
             items.push({ name: 'Dashboard', href: route('dashboard'), icon: LayoutDashboard, current: route().current('dashboard') });
         }
         
-        items.push({ name: 'Activities', href: route('timeline.index'), icon: Activity, current: route().current('timeline.index') });
         items.push({ name: 'History', href: route('sales-history.index'), icon: History, current: route().current('sales-history.index') });
         items.push({ name: 'Customers', href: route('customers.index'), icon: Users, current: route().current('customers.index') });
         items.push({ name: 'Shifts', href: route('shifts.index'), icon: Clock, current: route().current('shifts.index') });
