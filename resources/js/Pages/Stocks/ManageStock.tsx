@@ -763,6 +763,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                         <input
                                                             type="text"
                                                             ref={imeiSingleRef}
+                                                            inputMode="numeric"
                                                             value={singleForm.data.imei_1}
                                                             onChange={e => singleForm.setData('imei_1', e.target.value)}
                                                             onKeyDown={e => {
@@ -993,6 +994,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                         <label className="block text-xs font-bold uppercase text-gray-400 mb-1">IMEI</label>
                                                         <input
                                                             type="text"
+                                                            inputMode="numeric"
                                                             value={editForm.data.imei_1}
                                                             onChange={e => editForm.setData('imei_1', e.target.value)}
                                                             onKeyDown={e => {
