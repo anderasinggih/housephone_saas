@@ -73,6 +73,7 @@ function DonutChart({ data, title, isCurrency = false }: { data: Array<{ label: 
             return new Intl.NumberFormat('id-ID', {
                 style: 'currency',
                 currency: 'IDR',
+                minimumFractionDigits: 0,
                 maximumFractionDigits: 0
             }).format(val);
         }
@@ -156,6 +157,7 @@ function BarChart({ data }: { data: Array<{ month: string; revenue: number }> })
         return new Intl.NumberFormat('id-ID', {
             style: 'currency',
             currency: 'IDR',
+            minimumFractionDigits: 0,
             maximumFractionDigits: 0
         }).format(val);
     };
@@ -208,6 +210,7 @@ function StatCard({ title, value, description, icon }: { title: string; value: n
     const formatted = new Intl.NumberFormat('id-ID', {
         style: 'currency',
         currency: 'IDR',
+        minimumFractionDigits: 0,
         maximumFractionDigits: 0
     }).format(value);
 
@@ -253,6 +256,7 @@ export default function Dashboard({
         return new Intl.NumberFormat('id-ID', {
             style: 'currency',
             currency: 'IDR',
+            minimumFractionDigits: 0,
             maximumFractionDigits: 0
         }).format(val);
     };

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'housephone-cache-v1';
+const CACHE_NAME = 'housephone-cache-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/manifest.json',
@@ -36,6 +36,8 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   // Only cache GET requests
   if (event.request.method !== 'GET') return;
+  // Do not cache navigation requests (HTML pages) to prevent stale asset hashes from showing blank screens
+  if (event.request.mode === 'navigate') return;
 
   event.respondWith(
     fetch(event.request)

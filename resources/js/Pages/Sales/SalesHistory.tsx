@@ -160,6 +160,7 @@ export default function SalesHistory({ sales, affiliates, stores, filters }: Sal
         return new Intl.NumberFormat('id-ID', {
             style: 'currency',
             currency: 'IDR',
+            minimumFractionDigits: 0,
             maximumFractionDigits: 0
         }).format(val);
     };

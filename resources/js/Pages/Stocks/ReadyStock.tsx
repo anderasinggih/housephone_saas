@@ -334,6 +334,7 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
         return new Intl.NumberFormat('id-ID', {
             style: 'currency',
             currency: 'IDR',
+            minimumFractionDigits: 0,
             maximumFractionDigits: 0
         }).format(cleanVal);
     };
