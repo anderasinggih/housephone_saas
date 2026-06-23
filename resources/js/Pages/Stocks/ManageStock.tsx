@@ -177,9 +177,9 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
             imei_1: stock.imei_1 || '',
             supplier: stock.supplier || '',
             warranty_duration_days: stock.warranty_duration_days || '',
-            buy_price: stock.buy_price || '',
-            sell_price: stock.sell_price || '',
-            sell_price_reseller: stock.sell_price_reseller || '',
+            buy_price: stock.buy_price ? Math.round(parseFloat(stock.buy_price as any)) : '',
+            sell_price: stock.sell_price ? Math.round(parseFloat(stock.sell_price as any)) : '',
+            sell_price_reseller: stock.sell_price_reseller ? Math.round(parseFloat(stock.sell_price_reseller as any)) : '',
             qty: stock.qty || 1,
             status: stock.status || 'available'
         });
