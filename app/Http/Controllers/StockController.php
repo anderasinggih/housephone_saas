@@ -6,6 +6,7 @@ use App\Models\Stock;
 use App\Models\Store;
 use App\Models\DynamicParameter;
 use App\Models\DynamicParameterValue;
+use App\Models\Buyer;
 use App\Models\StockTransfer;
 use App\Models\User;
 use App\Models\ActivityLog;
@@ -50,6 +51,8 @@ class StockController extends Controller
             $q->where('is_active', true);
         }])->get();
 
+        $buyers = Buyer::orderBy('name', 'asc')->get();
+
         return Inertia::render('Stocks/ReadyStock', [
             'stocks' => $stocks,
             'stores' => $stores,
@@ -57,6 +60,7 @@ class StockController extends Controller
             'storesFilter' => Store::all(),
             'parameters' => $parameters,
             'users' => User::orderBy('name', 'asc')->get(),
+            'buyers' => $buyers,
             'filters' => [
                 'store_id' => $storeId,
             ]
@@ -66,6 +70,11 @@ class StockController extends Controller
     public function manageStock(Request $request): Response
     {
         $user = $request->user();
+        $storeId = $user->store_id;
+
+        if ($user->role === 'superadmin' && $request->has('store_id')) {
+            $storeId = $request->input('store_id');
+        }
 
         $stocks = Stock::with([
             'store',
@@ -75,7 +84,11 @@ class StockController extends Controller
             'license',
             'saleItems.sale.buyer',
             'saleItems.sale.affiliateUser'
-        ])->get();
+        ])
+        ->when($user->role !== 'superadmin', fn($q) => $q->where('store_id', $user->store_id))
+        ->when($user->role === 'superadmin' && $storeId, fn($q) => $q->where('store_id', $storeId))
+        ->get();
+        
         $stores = Store::all();
         
         $parameters = DynamicParameter::with(['values' => function($q) {
@@ -85,7 +98,10 @@ class StockController extends Controller
         return Inertia::render('Stocks/ManageStock', [
             'stocks' => $stocks,
             'stores' => $stores,
-            'parameters' => $parameters
+            'parameters' => $parameters,
+            'filters' => [
+                'store_id' => $storeId,
+            ]
         ]);
     }
 
@@ -105,10 +121,8 @@ class StockController extends Controller
             'color_id' => 'nullable|exists:dynamic_parameter_values,id',
             'memory_id' => 'nullable|exists:dynamic_parameter_values,id',
             'license_id' => 'nullable|exists:dynamic_parameter_values,id',
-            'grade' => 'nullable|string',
             'serial_number' => 'nullable|string|unique:stocks,serial_number',
             'imei_1' => 'nullable|string|unique:stocks,imei_1',
-            'imei_2' => 'nullable|string|unique:stocks,imei_2',
             'supplier' => 'nullable|string',
             'warranty_duration_days' => 'required|integer|min:0',
             'buy_price' => 'required|numeric|min:0',
@@ -116,6 +130,9 @@ class StockController extends Controller
             'sell_price_reseller' => 'nullable|numeric|min:0',
             'qty' => 'required|integer|min:1',
         ]);
+        
+        // Remove grade/imei_2 if passed from old form
+        unset($validated['grade'], $validated['imei_2']);
 
         $stock = Stock::create($validated);
         ActivityLog::log('add_stock', Stock::class, $stock->id, $stock->toArray());
@@ -139,7 +156,6 @@ class StockController extends Controller
             'color_id' => 'nullable|exists:dynamic_parameter_values,id',
             'memory_id' => 'nullable|exists:dynamic_parameter_values,id',
             'license_id' => 'nullable|exists:dynamic_parameter_values,id',
-            'grade' => 'nullable|string',
             'supplier' => 'nullable|string',
             'warranty_duration_days' => 'required|integer|min:0',
             'buy_price' => 'required|numeric|min:0',
@@ -148,7 +164,6 @@ class StockController extends Controller
             'items' => 'required|array|min:1',
             'items.*.serial_number' => 'required|string|unique:stocks,serial_number',
             'items.*.imei_1' => 'required|string|unique:stocks,imei_1',
-            'items.*.imei_2' => 'nullable|string|unique:stocks,imei_2',
         ]);
 
         DB::transaction(function () use ($request) {
@@ -162,10 +177,8 @@ class StockController extends Controller
                     'color_id' => $request->input('color_id'),
                     'memory_id' => $request->input('memory_id'),
                     'license_id' => $request->input('license_id'),
-                    'grade' => $request->input('grade'),
                     'serial_number' => $item['serial_number'],
                     'imei_1' => $item['imei_1'],
-                    'imei_2' => $item['imei_2'] ?? null,
                     'supplier' => $request->input('supplier'),
                     'warranty_duration_days' => $request->input('warranty_duration_days'),
                     'buy_price' => $request->input('buy_price'),

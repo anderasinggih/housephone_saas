@@ -84,4 +84,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(ActivityLog::class);
     }
+
+    public function employeeSchedules(): HasMany
+    {
+        return $this->hasMany(EmployeeSchedule::class);
+    }
 }

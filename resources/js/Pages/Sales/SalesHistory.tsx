@@ -233,7 +233,7 @@ export default function SalesHistory({ sales, affiliates, stores, filters }: Sal
                     *** LUNAS / TERIMA KASIH ***
                 </div>
                 <div class="footer">
-                    Barang yang sudah dibeli dapat diretur dalam masa garansi toko dengan restocking fee 10%.
+                    Barang yang sudah dibeli dapat diretur dalam masa garansi toko dengan biaya pemotongan (restocking fee).
                 </div>
             </body>
             </html>
@@ -334,59 +334,54 @@ export default function SalesHistory({ sales, affiliates, stores, filters }: Sal
     };
 
     return (
-        <AuthenticatedLayout
-            header={
-                <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-                    <div>
-                        <h2 className="text-2xl font-semibold tracking-tight text-foreground">
-                            Riwayat Penjualan & Klaim
-                        </h2>
-                        <p className="text-sm font-medium text-muted-foreground">
-                            Cari invoice penjualan, cetak struk kasir thermal, retur barang, atau klaim garansi toko.
-                        </p>
-                    </div>
-
-                    {authUser.role === 'superadmin' && (
-                        <div className="flex items-center gap-2">
-                            <select
-                                value={storeFilterId}
-                                onChange={(e) => {
-                                    setStoreFilterId(e.target.value);
-                                    window.location.href = route('sales-history.index', { store_id: e.target.value });
-                                }}
-                                className="rounded-xl border border-input bg-background px-4 py-2 text-sm font-bold text-foreground shadow-sm focus:border-indigo-500 focus:outline-none"
-                            >
-                                <option value="">Semua Cabang</option>
-                                {stores.map(s => (
-                                    <option key={s.id} value={s.id}>{s.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
-                </div>
-            }
-        >
-            <Head title="Riwayat Invoice & Penjualan" />
+        <AuthenticatedLayout>
+            <Head title="Sales History" />
 
             <div className="py-8">
                 <div className="mx-auto max-w-none px-4 sm:px-6 lg:px-8 space-y-8">
                     
-                    {/* Filter and Search */}
-                    <div className="relative max-w-md">
-                        <Search className="absolute left-3.5 top-3 h-4 w-4 text-gray-400" />
-                        <input
-                            type="text"
-                            placeholder="Cari No. Invoice, nama pembeli, atau No. HP..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full rounded-xl border border-input bg-background pl-10 pr-4 py-2.5 text-sm font-bold text-foreground shadow-sm focus:border-indigo-500 focus:outline-none"
-                        />
+                    {/* Search & Filter Row */}
+                    <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
+                        {/* Search Bar */}
+                        <div className="relative flex-1 max-w-md">
+                            <span className="absolute inset-y-0 left-0 flex items-center pl-3">
+                                <svg className="h-4 w-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                            </span>
+                            <input
+                                type="text"
+                                placeholder="Cari invoice, nama pelanggan, atau nomor SN..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full rounded-xl border border-input bg-background pl-9 pr-4 py-2 text-sm font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                            />
+                        </div>
+
+                        {/* Store filter dropdown */}
+                        {authUser.role === 'superadmin' && (
+                            <div className="w-full sm:w-48">
+                                <select
+                                    value={storeFilterId}
+                                    onChange={(e) => {
+                                        setStoreFilterId(e.target.value);
+                                        window.location.href = route('sales-history.index', { store_id: e.target.value });
+                                    }}
+                                    className="w-full rounded-xl border border-input bg-background py-2 px-3 text-sm font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                >
+                                    <option value="">Semua Cabang</option>
+                                    {stores.map(s => (
+                                        <option key={s.id} value={s.id}>{s.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-1 gap-8 lg:grid-cols-3 items-start">
                         {/* Sales Invoices List */}
-                        <div className="lg:col-span-2 rounded-lg border border-border bg-card p-6 shadow-sm text-card-foreground space-y-4">
-                            <h3 className="text-lg font-semibold text-foreground">Daftar Transaksi</h3>
+                        <div className="lg:col-span-2 rounded-lg border border-border bg-card p-4 sm:p-6 shadow-sm text-card-foreground space-y-4">
+                            <h3 className="text-base font-bold text-foreground">Daftar Transaksi</h3>
                             <div className="divide-y divide-gray-100 dark:divide-gray-800">
                                 {filteredSales.length === 0 ? (
                                     <p className="text-center text-sm text-gray-400 py-8">Tidak ada invoice transaksi ditemukan.</p>
@@ -395,19 +390,19 @@ export default function SalesHistory({ sales, affiliates, stores, filters }: Sal
                                         <div 
                                             key={sale.id}
                                             onClick={() => setSelectedSale(sale)}
-                                            className={`flex flex-col sm:flex-row sm:items-center sm:justify-between py-4 cursor-pointer hover:bg-muted/50 dark:hover:bg-gray-900/50 px-2 rounded-xl transition ${
+                                            className={`flex flex-col sm:flex-row sm:items-center sm:justify-between py-2.5 px-2.5 my-1.5 cursor-pointer hover:bg-muted/50 dark:hover:bg-gray-900/50 rounded-xl transition ${
                                                 selectedSale?.id === sale.id ? 'bg-indigo-50/50 dark:bg-indigo-950/20' : ''
                                             }`}
                                         >
                                             <div className="space-y-1">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="font-semibold text-foreground">{sale.invoice_number}</span>
+                                                    <span className="font-bold text-sm text-foreground">{sale.invoice_number}</span>
                                                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                                                         sale.status === 'completed' 
-                                                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded text-xs' 
+                                                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' 
                                                             : sale.status === 'booking'
-                                                                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded text-xs'
-                                                                : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded text-xs'
+                                                                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                                                                : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
                                                     }`}>
                                                         {sale.status}
                                                     </span>
@@ -421,7 +416,7 @@ export default function SalesHistory({ sales, affiliates, stores, filters }: Sal
                                             </div>
                                             <div className="mt-2 sm:mt-0 flex items-center gap-4 text-right">
                                                 <div>
-                                                    <p className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">{formatCurrency(sale.total_amount)}</p>
+                                                    <p className="text-sm font-bold text-indigo-600 dark:text-indigo-400">{formatCurrency(sale.total_amount)}</p>
                                                     <p className="text-[10px] font-bold uppercase text-gray-400">{sale.payment_method}</p>
                                                 </div>
                                             </div>
@@ -532,7 +527,7 @@ export default function SalesHistory({ sales, affiliates, stores, filters }: Sal
                                             {selectedSale.returns.map(ret => (
                                                 <div key={ret.id} className="bg-rose-50/50 dark:bg-rose-950/10 border border-rose-100 dark:border-rose-900 p-2.5 rounded-lg text-xs space-y-1">
                                                     <div className="flex justify-between font-bold">
-                                                        <span>Denda Restocking (10%):</span>
+                                                        <span>Denda Restocking:</span>
                                                         <span className="text-rose-600">{formatCurrency(ret.restocking_fee)}</span>
                                                     </div>
                                                     <div className="flex justify-between font-bold">
@@ -661,7 +656,7 @@ export default function SalesHistory({ sales, affiliates, stores, filters }: Sal
                                             restocking_fee: price * 0.1 // 10% restocking fee recommendation
                                         }));
                                     }}
-                                    className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold text-gray-800 dark:border-input dark:bg-background"
+                                    className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold text-foreground dark:border-input dark:bg-background"
                                 >
                                     {selectedSale.items.map(item => (
                                         <option key={item.stock_id} value={item.stock_id}>
@@ -672,13 +667,13 @@ export default function SalesHistory({ sales, affiliates, stores, filters }: Sal
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Biaya Pemotongan / Restocking Fee (10% standard)</label>
+                                <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Biaya Pemotongan / Restocking Fee (Standar 10% / Bisa Disesuaikan)</label>
                                 <input
                                     type="number"
                                     required
-                                    value={returnForm.data.restocking_fee}
+                                    value={returnForm.data.restocking_fee === 0 ? '' : returnForm.data.restocking_fee}
                                     onChange={(e) => returnForm.setData('restocking_fee', parseFloat(e.target.value) || 0)}
-                                    className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold text-gray-800 dark:border-input dark:bg-background"
+                                    className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold text-foreground dark:border-input dark:bg-background"
                                 />
                             </div>
 
@@ -688,7 +683,7 @@ export default function SalesHistory({ sales, affiliates, stores, filters }: Sal
                                     type="text"
                                     value={returnForm.data.notes}
                                     onChange={(e) => returnForm.setData('notes', e.target.value)}
-                                    className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold text-gray-800 dark:border-input dark:bg-background"
+                                    className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold text-foreground dark:border-input dark:bg-background"
                                     placeholder="Contoh: Kamera buram, tukar tipe lain"
                                 />
                             </div>

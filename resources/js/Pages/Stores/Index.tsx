@@ -228,15 +228,7 @@ export default function Index({ stores }: IndexProps) {
     return (
         <AuthenticatedLayout
             header={
-                <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-                    <div>
-                        <h2 className="text-2xl font-semibold tracking-tight text-foreground">
-                            Kelola Cabang Toko
-                        </h2>
-                        <p className="text-sm font-medium text-muted-foreground">
-                            Tambah cabang, atur koordinat geofence GPS untuk absensi, dan lihat metrik cabang.
-                        </p>
-                    </div>
+                <div className="flex flex-col justify-end gap-4 sm:flex-row sm:items-center w-full">
 
                     <button
                         onClick={() => setIsAddOpen(true)}

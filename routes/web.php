@@ -17,6 +17,8 @@ Route::get('/', function () {
     return redirect()->route('dashboard');
 });
 
+Route::get('/invoice/{invoice_number}', [SaleController::class, 'publicInvoice'])->name('public.invoice');
+
 Route::middleware(['auth', 'verified'])->group(function () {
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
@@ -25,8 +27,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/timeline', [ActivityLogController::class, 'index'])->name('timeline.index');
 
     // Stocks
-    Route::get('/ready-stock', [StockController::class, 'readyStock'])->name('ready-stock.index');
-    Route::get('/manage-stock', [StockController::class, 'manageStock'])->name('manage-stock.index');
+    Route::get('/selling', [StockController::class, 'readyStock'])->name('selling.index');
+    Route::get('/sale-data', [StockController::class, 'manageStock'])->name('sale-data.index');
     Route::post('/stocks', [StockController::class, 'store'])->name('stocks.store');
     Route::post('/stocks/batch', [StockController::class, 'storeBatch'])->name('stocks.store-batch');
     Route::post('/stocks/transfer', [StockController::class, 'transfer'])->name('stocks.transfer');
@@ -65,6 +67,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/stores', [StoreManagementController::class, 'store'])->name('stores.store');
     Route::patch('/stores/{store}', [StoreManagementController::class, 'update'])->name('stores.update');
     Route::delete('/stores/{store}', [StoreManagementController::class, 'destroy'])->name('stores.destroy');
+
+    // General Settings & Schedules
+    Route::get('/settings/general', [\App\Http\Controllers\GeneralSettingsController::class, 'index'])->name('settings.general');
+    Route::post('/settings/general', [\App\Http\Controllers\GeneralSettingsController::class, 'update'])->name('settings.general.update');
+    Route::post('/settings/schedule', [\App\Http\Controllers\GeneralSettingsController::class, 'storeSchedule'])->name('settings.schedule.store');
+    Route::delete('/settings/schedule/{schedule}', [\App\Http\Controllers\GeneralSettingsController::class, 'destroySchedule'])->name('settings.schedule.destroy');
 
     // Profile
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

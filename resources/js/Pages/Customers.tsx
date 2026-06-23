@@ -53,18 +53,7 @@ export default function Customers({ customers }: CustomersProps) {
     const vipCustomer = customers.reduce((prev, curr) => (prev.total_spent > curr.total_spent) ? prev : curr, {} as Customer);
 
     return (
-        <AuthenticatedLayout
-            header={
-                <div>
-                    <h2 className="text-2xl font-semibold tracking-tight text-foreground">
-                        Direktori Pelanggan
-                    </h2>
-                    <p className="text-sm font-medium text-muted-foreground">
-                        Pantau riwayat belanja pembeli, total pengeluaran, dan identifikasi pelanggan VIP atau mitra reseller.
-                    </p>
-                </div>
-            }
-        >
+        <AuthenticatedLayout>
             <Head title="Direktori Pelanggan" />
 
             <div className="py-8">

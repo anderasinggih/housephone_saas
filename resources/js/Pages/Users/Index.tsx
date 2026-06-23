@@ -104,15 +104,7 @@ export default function Index({ users, stores }: IndexProps) {
     return (
         <AuthenticatedLayout
             header={
-                <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-                    <div>
-                        <h2 className="text-2xl font-semibold tracking-tight text-foreground">
-                            Kelola Karyawan & Pengguna
-                        </h2>
-                        <p className="text-sm font-medium text-muted-foreground">
-                            Kelola akun pengguna, edit peran akses, dan asosiasikan karyawan ke cabang toko tertentu.
-                        </p>
-                    </div>
+                <div className="flex flex-col justify-end gap-4 sm:flex-row sm:items-center w-full">
 
                     <button
                         onClick={() => setIsAddOpen(true)}

@@ -34,6 +34,11 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'auth' => [
                 'user' => $request->user(),
+                'checkedInToday' => $request->user() 
+                    ? \App\Models\Attendance::where('user_id', $request->user()->id)
+                        ->whereDate('clock_in', \Carbon\Carbon::today())
+                        ->exists()
+                    : false,
             ],
             'ziggy' => fn () => [
                 ...(new Ziggy)->toArray(),

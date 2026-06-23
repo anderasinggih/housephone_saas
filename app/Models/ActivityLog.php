@@ -30,7 +30,7 @@ class ActivityLog extends Model
 
     public static function log(string $action, ?string $modelType = null, ?int $modelId = null, ?array $newValues = null, ?array $oldValues = null): void
     {
-        self::create([
+        $log = self::create([
             'user_id' => auth()->id(),
             'action' => $action,
             'model_type' => $modelType,
@@ -40,5 +40,17 @@ class ActivityLog extends Model
             'ip_address' => request()->ip(),
             'user_agent' => request()->userAgent()
         ]);
+
+        try {
+            $settings = \App\Models\GeneralSetting::first();
+            if ($settings && !empty($settings->notification_emails)) {
+                $emails = array_filter(array_map('trim', explode(',', $settings->notification_emails)));
+                if (!empty($emails)) {
+                    \Illuminate\Support\Facades\Mail::to($emails)->send(new \App\Mail\TimelineActivityMail($log));
+                }
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to send timeline email notification: ' . $e->getMessage());
+        }
     }
 }

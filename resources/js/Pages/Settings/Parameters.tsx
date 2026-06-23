@@ -56,9 +56,7 @@ export default function Parameters({ parameters }: ParametersProps) {
                             <Settings className="h-6 w-6 text-indigo-500" />
                             Pengaturan Parameter Dropdown
                         </h2>
-                        <p className="text-sm font-medium text-muted-foreground mt-1">
-                            Kelola opsi dropdown dinamis untuk produk (Brand, Warna, Kapasitas Memori, dan Lisensi Sinyal).
-                        </p>
+
                     </div>
 
                     <div className="grid grid-cols-1 gap-8 md:grid-cols-2">

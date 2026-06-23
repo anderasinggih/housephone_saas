@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage, router } from '@inertiajs/react';
 import { 
     ShoppingBag, 
     PlusCircle, 
@@ -14,8 +14,10 @@ import {
     RotateCcw, 
     Wrench,
     Clock,
-    User
+    User,
+    Filter
 } from 'lucide-react';
+import { useState } from 'react';
 
 interface ActivityLog {
     id: number;
@@ -33,6 +35,10 @@ interface ActivityLog {
         name: string;
         email: string;
         role: string;
+        store?: {
+            id: number;
+            name: string;
+        } | null;
     };
 }
 
@@ -50,6 +56,23 @@ interface TimelineProps {
 }
 
 export default function Timeline({ activities }: TimelineProps) {
+    const { filters } = usePage().props as any;
+    const [search, setSearch] = useState(filters?.search || '');
+    const [actionType, setActionType] = useState(filters?.action_type || '');
+    const [date, setDate] = useState(filters?.date || '');
+    const [showFilters, setShowFilters] = useState(!!(filters?.action_type || filters?.date));
+
+    const applyFilters = (newSearch = search, newAction = actionType, newDate = date) => {
+        router.get(route('timeline.index'), {
+            search: newSearch,
+            action_type: newAction,
+            date: newDate
+        }, {
+            preserveState: true,
+            replace: true
+        });
+    };
+
     const formatCurrency = (val: any) => {
         const num = parseFloat(val) || 0;
         return new Intl.NumberFormat('id-ID', {
@@ -66,11 +89,12 @@ export default function Timeline({ activities }: TimelineProps) {
         const diffMins = Math.floor(diffMs / 60000);
         const diffHours = Math.floor(diffMins / 60);
         const diffDays = Math.floor(diffHours / 24);
+        const timeStr = date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
         if (diffMins < 1) return 'Baru saja';
         if (diffMins < 60) return `${diffMins} menit lalu`;
-        if (diffHours < 24) return `${diffHours} jam lalu`;
-        if (diffDays === 1) return 'Kemarin';
+        if (diffHours < 24) return `${diffHours} jam lalu (${timeStr})`;
+        if (diffDays === 1) return `Kemarin, ${timeStr}`;
         return date.toLocaleDateString('id-ID', { 
             day: 'numeric', 
             month: 'short', 
@@ -238,19 +262,116 @@ export default function Timeline({ activities }: TimelineProps) {
 
     return (
         <AuthenticatedLayout>
-            <Head title="Timeline Aktivitas" />
+            <Head title="Activities" />
 
             <div className="py-8">
                 <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 space-y-8">
-                    
-                    {/* Header */}
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                        <div>
-                            <h2 className="text-2xl font-bold tracking-tight text-foreground">Timeline Aktivitas</h2>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                                Lacak seluruh aktivitas dan transaksi operasional toko secara real-time.
-                            </p>
+
+                    {/* Search & Filter Header Panel */}
+                    <div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4 text-card-foreground">
+                        <div className="flex flex-col sm:flex-row gap-3 items-center">
+                            {/* Search Input */}
+                            <div className="relative flex-1 w-full">
+                                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <svg className="h-4 w-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                    </svg>
+                                </span>
+                                <input
+                                    type="text"
+                                    placeholder="Cari user, email, ip..."
+                                    value={search}
+                                    onChange={e => setSearch(e.target.value)}
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter') applyFilters(search, actionType, date);
+                                    }}
+                                    className="pl-9 w-full rounded-xl border border-input bg-background py-2 text-sm font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                />
+                            </div>
+
+                            {/* Expand/Collapse Toggle Button */}
+                            <button
+                                onClick={() => setShowFilters(!showFilters)}
+                                className={`w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl border transition ${
+                                    showFilters || actionType || date
+                                        ? 'bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900'
+                                        : 'bg-background hover:bg-muted border-input'
+                                }`}
+                            >
+                                <Filter className="h-3.5 w-3.5" />
+                                Filter
+                            </button>
                         </div>
+
+                        {/* Expandable filters panel */}
+                        {showFilters && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-border/50 animate-in fade-in duration-200">
+                                {/* Action Filter */}
+                                <div>
+                                    <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Aktivitas</label>
+                                    <select
+                                        value={actionType}
+                                        onChange={e => {
+                                            setActionType(e.target.value);
+                                            applyFilters(search, e.target.value, date);
+                                        }}
+                                        className="w-full rounded-xl border border-input bg-background py-2 px-3 text-sm font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    >
+                                        <option value="">Semua Aktivitas</option>
+                                        <option value="add_stock">Tambah Stok</option>
+                                        <option value="sale_checkout">Penjualan</option>
+                                        <option value="stock_transfer_initiated">Mutasi Diajukan</option>
+                                        <option value="stock_transfer_approved">Mutasi Disetujui</option>
+                                        <option value="shift_clock_in">Clock In</option>
+                                        <option value="shift_clock_out">Clock Out</option>
+                                        <option value="shift_cash_drop">Setoran Cash Drop</option>
+                                        <option value="shift_petty_cash">Kas Kecil</option>
+                                        <option value="sale_void_requested">Void Diajukan</option>
+                                        <option value="sale_void_approved">Void Disetujui</option>
+                                        <option value="sale_return">Retur Barang</option>
+                                        <option value="warranty_claim">Klaim Garansi</option>
+                                        <option value="warranty_update">Servis Diperbarui</option>
+                                    </select>
+                                </div>
+
+                                {/* Date Filter */}
+                                <div>
+                                    <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Tanggal</label>
+                                    <input
+                                        type="date"
+                                        value={date}
+                                        onChange={e => {
+                                            setDate(e.target.value);
+                                            applyFilters(search, actionType, e.target.value);
+                                        }}
+                                        className="w-full rounded-xl border border-input bg-background py-2 px-3 text-sm font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    />
+                                </div>
+
+                                {/* Reset & Apply actions */}
+                                <div className="sm:col-span-2 flex justify-between items-center pt-2 mt-2 border-t border-border/20">
+                                    {(search || actionType || date) && (
+                                        <button
+                                            onClick={() => {
+                                                setSearch('');
+                                                setActionType('');
+                                                setDate('');
+                                                router.get(route('timeline.index'), {}, { replace: true });
+                                            }}
+                                            className="text-xs font-semibold text-rose-500 hover:text-rose-600 transition"
+                                        >
+                                            Reset Filter
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => applyFilters(search, actionType, date)}
+                                        className="ml-auto rounded-xl bg-indigo-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition"
+                                    >
+                                        Terapkan
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Timeline Feed Container */}
@@ -309,7 +430,7 @@ export default function Timeline({ activities }: TimelineProps) {
 
                                         {/* Optional details (metadata/ip) */}
                                         <div className="mt-3 flex items-center justify-between text-[10px] text-gray-400 dark:text-gray-500 pl-1 pt-2 border-t border-border/20">
-                                            <span>Cabang: {log.user?.role === 'superadmin' ? 'Superadmin Access' : (log.user?.role || 'Karyawan')}</span>
+                                            <span>Cabang: {log.user?.role === 'superadmin' ? 'Superadmin Access' : (log.user?.store?.name || 'Gudang Utama')}</span>
                                             <span>IP: {log.ip_address || '-'}</span>
                                         </div>
                                     </div>

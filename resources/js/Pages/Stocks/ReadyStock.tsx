@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, useForm, usePage } from '@inertiajs/react';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { 
     Search, 
     Smartphone, 
@@ -17,7 +17,11 @@ import {
     ArrowUpRight,
     Wrench,
     Tag,
-    Share2
+    Share2,
+    QrCode,
+    MessageCircle,
+    Send,
+    ExternalLink
 } from 'lucide-react';
 
 interface ParameterValue {
@@ -42,10 +46,8 @@ interface StockItem {
     color_id: number | null;
     memory_id: number | null;
     license_id: number | null;
-    grade: string | null;
     serial_number: string | null;
     imei_1: string | null;
-    imei_2: string | null;
     supplier: string | null;
     warranty_duration_days: number;
     buy_price: number;
@@ -57,6 +59,13 @@ interface StockItem {
     color?: { value: string };
     memory?: { value: string };
     license?: { value: string };
+}
+
+interface Buyer {
+    id: number;
+    name: string;
+    phone: string;
+    address: string | null;
 }
 
 interface Store {
@@ -94,12 +103,28 @@ interface ReadyStockProps {
     storesFilter: Store[];
     parameters: Parameter[];
     users?: UserOption[];
+    buyers?: Buyer[];
     filters: {
         store_id: string | null;
     };
 }
 
-export default function ReadyStock({ stocks, stores, transfers, storesFilter, parameters, users = [], filters }: ReadyStockProps) {
+// Phone normalizer: strips non-numeric, converts +62/62 to 08...
+const normalizePhone = (raw: string): string => {
+    let phone = raw.replace(/[^\d+]/g, '');
+    if (phone.startsWith('+62')) phone = '0' + phone.slice(3);
+    else if (phone.startsWith('62') && phone.length > 10) phone = '0' + phone.slice(2);
+    return phone;
+};
+
+// Convert local 08xxx to WA format 628xxx
+const toWANumber = (phone: string): string => {
+    const clean = normalizePhone(phone);
+    if (clean.startsWith('0')) return '62' + clean.slice(1);
+    return clean;
+};
+
+export default function ReadyStock({ stocks, stores, transfers, storesFilter, parameters, users = [], buyers = [], filters }: ReadyStockProps) {
     const authUser = usePage().props.auth.user as any;
     
     // Search and Category Tabs
@@ -108,9 +133,15 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
     const [storeFilterId, setStoreFilterId] = useState(filters.store_id || '');
 
     // Modals
+    const [selectedStockDetail, setSelectedStockDetail] = useState<StockItem | null>(null);
     const [selectedStock, setSelectedStock] = useState<StockItem | null>(null);
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
     const [isTransferOpen, setIsTransferOpen] = useState(false);
+    // Success modal with WA/invoice
+    const [successData, setSuccessData] = useState<{ invoiceNumber: string; buyerPhone: string; buyerName: string; total: number } | null>(null);
+
+    // Barcode scanner ref
+    const imeiInputRef = useRef<HTMLInputElement>(null);
 
     // Dynamic Lists for checkout dropdowns
     const brandOptions = parameters.find(p => p.name.toLowerCase() === 'brand' || p.name.toLowerCase() === 'merek')?.values || [];
@@ -126,30 +157,29 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
         return (new Date(Date.now() - tzoffset)).toISOString().slice(0, 16);
     };
 
-    // Checkout Form
+    // Checkout Form — prices are strings to avoid "0" prefill issue
     const checkoutForm = useForm({
+        store_id: '' as string | number,
         buyer_name: '',
         buyer_phone: '',
         buyer_address: '',
         payment_method: 'cash' as 'cash' | 'online',
         payment_detail: '',
-        dp_amount: 0,
+        dp_amount: '' as string | number,
         status: 'completed' as 'booking' | 'completed',
         affiliate_user_id: '' as string | number,
-        affiliate_fee: 0,
+        affiliate_fee: '' as string | number,
         transaction_date: getLocalDateTimeString(),
-        items: [] as Array<{ stock_id: number; qty: number; actual_sell_price: number }>,
+        items: [] as Array<{ stock_id: number; qty: number; actual_sell_price: string | number }>,
         trade_in: null as null | {
             name: string;
             brand_id: number | string;
             color_id: number | string;
             memory_id: number | string;
             license_id: number | string;
-            grade: string;
             serial_number: string;
             imei_1: string;
-            imei_2: string;
-            buy_price: number;
+            buy_price: string | number;
         },
         extras: [] as Array<{ extra_id: number; charge_to: 'buyer' | 'seller' | 'free_promotion'; sell_price: number; buy_price: number }>
     });
@@ -176,15 +206,16 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
     const openCheckout = (stock: StockItem) => {
         setSelectedStock(stock);
         checkoutForm.setData({
+            store_id: stock.store_id || '',
             buyer_name: '',
             buyer_phone: '',
             buyer_address: '',
             payment_method: 'cash',
             payment_detail: '',
-            dp_amount: 0,
+            dp_amount: '',
             status: 'completed',
             affiliate_user_id: '',
-            affiliate_fee: 0,
+            affiliate_fee: '',
             transaction_date: getLocalDateTimeString(),
             items: [{ stock_id: stock.id, qty: 1, actual_sell_price: stock.sell_price }],
             trade_in: null,
@@ -214,27 +245,29 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
         });
     };
 
-    // Handle Checkout submit
+    // Handle Checkout submit — after success show WA/Invoice modal
     const submitCheckout = (e: React.FormEvent) => {
         e.preventDefault();
+        // Grab data before submit for success modal
+        const buyerName = checkoutForm.data.buyer_name;
+        const buyerPhone = checkoutForm.data.buyer_phone;
+        const total = calculateTotal();
+        
         checkoutForm.post(route('sales.checkout'), {
-            onSuccess: () => {
+            onSuccess: (page) => {
                 setIsCheckoutOpen(false);
                 setSelectedStock(null);
-                alert('Transaksi berhasil disimpan!');
+                // Try to extract invoice number from flash or generate a placeholder
+                const flash = (page.props as any).flash;
+                const invoiceNumber = flash?.invoice_number || '';
+                setSuccessData({ invoiceNumber, buyerPhone, buyerName, total });
             },
-            onError: (errs) => {
-                alert(errs.error || Object.values(errs).join('\n'));
+            onError: () => {
+                // Errors shown inline via checkoutForm.errors
             }
         });
     };
 
-    // Handle Approval of Mutation
-    const approveTransfer = (transferId: number) => {
-        if(confirm('Apakah Anda yakin ingin menyetujui mutasi unit ini ke cabang Anda?')) {
-            useForm().post(route('stocks.transfer.approve', transferId));
-        }
-    };
 
     // Toggle Trade In
     const toggleTradeIn = () => {
@@ -247,11 +280,9 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                 color_id: colorOptions[0]?.id || '',
                 memory_id: memoryOptions[0]?.id || '',
                 license_id: licenseOptions[0]?.id || '',
-                grade: 'Grade A',
                 serial_number: '',
                 imei_1: '',
-                imei_2: '',
-                buy_price: 0
+                buy_price: ''
             });
         }
     };
@@ -288,8 +319,7 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
         let addonsCost = 0;
         checkoutForm.data.extras.forEach(e => {
             if (e.charge_to === 'buyer') {
-                const sellPrice = e.sell_price;
-                addonsCost += Number(sellPrice) || 0;
+                addonsCost += Number(e.sell_price) || 0;
             }
         });
 
@@ -308,66 +338,77 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
         }).format(cleanVal);
     };
 
-    return (
-        <AuthenticatedLayout
-            header={
-                <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-                    <div>
-                        <h2 className="text-2xl font-semibold tracking-tight text-foreground">
-                            Ready Stock Unit
-                        </h2>
-                        <p className="text-sm font-medium text-muted-foreground">
-                            Kelola unit siap jual dan ajukan mutasi stok antar cabang.
-                        </p>
-                    </div>
+    // Select existing buyer
+    const selectBuyer = (buyer: Buyer) => {
+        checkoutForm.setData({
+            ...checkoutForm.data,
+            buyer_name: buyer.name,
+            buyer_phone: buyer.phone,
+            buyer_address: buyer.address || '',
+        });
+    };
 
-                    {/* Filter store if superadmin */}
-                    {authUser.role === 'superadmin' && (
-                        <div className="flex items-center gap-2">
-                            <select
-                                value={storeFilterId}
-                                onChange={(e) => {
-                                    setStoreFilterId(e.target.value);
-                                    window.location.href = route('ready-stock.index', { store_id: e.target.value });
-                                }}
-                                className="rounded-xl border border-input bg-background px-4 py-2 text-sm font-bold text-foreground shadow-sm focus:border-indigo-500 focus:outline-none"
-                            >
-                                <option value="">Semua Cabang</option>
-                                {storesFilter.map(s => (
-                                    <option key={s.id} value={s.id}>{s.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
-                </div>
-            }
-        >
-            <Head title="Ready Stock Unit Siap Jual" />
+    // WA helpers
+    const openWAChat = (phone: string, buyerName: string) => {
+        const waNum = toWANumber(phone);
+        const msg = encodeURIComponent(`Halo ${buyerName}! Terima kasih sudah berbelanja di toko kami. 😊`);
+        window.open(`https://wa.me/${waNum}?text=${msg}`, '_blank');
+    };
+
+    const openWAInvoice = (phone: string, buyerName: string, invoiceNumber: string, total: number) => {
+        const waNum = toWANumber(phone);
+        const invoiceUrl = `${window.location.origin}/invoice/${invoiceNumber}`;
+        const msg = encodeURIComponent(
+            `Halo ${buyerName}! 🛍️\n\nTerima kasih sudah berbelanja di toko kami.\n\n` +
+            `*Invoice:* ${invoiceNumber}\n*Total:* ${formatCurrency(total)}\n\n` +
+            `Lihat invoice online Anda di:\n${invoiceUrl}\n\nSalam,\nTim Toko`
+        );
+        window.open(`https://wa.me/${waNum}?text=${msg}`, '_blank');
+    };
+
+    return (
+        <AuthenticatedLayout>
+            <Head title="Selling" />
 
             <div className="py-8">
                 <div className="mx-auto max-w-none px-4 sm:px-6 lg:px-8 space-y-8">
                     
-                    {/* Filter & Search Bar */}
-                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                        {/* Tabs */}
-                        <div className="flex flex-wrap gap-2">
-                            {(['all', 'iphone', 'android', 'accessories', 'extra'] as const).map((tab) => (
-                                <button
-                                    key={tab}
-                                    onClick={() => setActiveTab(tab)}
-                                    className={`rounded-xl px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition-all duration-200 ${
-                                        activeTab === tab
-                                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
-                                            : 'bg-card text-gray-600 border border-input hover:bg-muted dark:bg-background dark:text-gray-400 dark:border-input'
-                                    }`}
+                    {/* Filter Row: Category Dropdown + Store Filter + Search */}
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                        <div className="flex items-center gap-2">
+                            {/* Category Dropdown */}
+                            <select
+                                value={activeTab}
+                                onChange={(e) => setActiveTab(e.target.value as any)}
+                                className="rounded-xl border border-input bg-background px-3.5 py-2.5 text-sm font-semibold text-foreground shadow-sm focus:border-indigo-500 focus:outline-none"
+                            >
+                                <option value="all">Semua Stok</option>
+                                <option value="iphone">iPhone</option>
+                                <option value="android">Android</option>
+                                <option value="accessories">Accessories</option>
+                                <option value="extra">Extra / Jasa</option>
+                            </select>
+
+                            {/* Store Filter (superadmin only) */}
+                            {authUser.role === 'superadmin' && (
+                                <select
+                                    value={storeFilterId}
+                                    onChange={(e) => {
+                                        setStoreFilterId(e.target.value);
+                                        window.location.href = route('selling.index', { store_id: e.target.value });
+                                    }}
+                                    className="rounded-xl border border-input bg-background px-3.5 py-2.5 text-sm font-semibold text-foreground shadow-sm focus:border-indigo-500 focus:outline-none"
                                 >
-                                    {tab === 'all' ? 'Semua Stok' : tab}
-                                </button>
-                            ))}
+                                    <option value="">Semua Cabang</option>
+                                    {storesFilter.map(s => (
+                                        <option key={s.id} value={s.id}>{s.name}</option>
+                                    ))}
+                                </select>
+                            )}
                         </div>
 
                         {/* Search Input */}
-                        <div className="relative max-w-md w-full">
+                        <div className="relative flex-1">
                             <Search className="absolute left-3.5 top-3 h-4 w-4 text-gray-400" />
                             <input
                                 type="text"
@@ -377,176 +418,232 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                 className="w-full rounded-xl border border-input bg-background pl-10 pr-4 py-2.5 text-sm font-bold text-foreground shadow-sm focus:border-indigo-500 focus:outline-none"
                             />
                         </div>
-                    </div>
-
-                    {/* Stock Table Layout */}
-                    <div className="rounded-lg border border-border bg-card p-6 shadow-sm text-card-foreground">
-                        <div className="overflow-x-auto">
-                            <table className="w-full min-w-[1000px] text-left border-collapse text-sm">
-                                <thead>
-                                    <tr className="border-b border-border dark:border-input text-xs font-bold uppercase tracking-wider text-gray-400">
-                                        <th className="pb-3 font-semibold">Nama Unit</th>
-                                        <th className="pb-3 font-semibold">Kondisi / Grade</th>
-                                        <th className="pb-3 font-semibold">Spesifikasi</th>
-                                        <th className="pb-3 font-semibold">SN / IMEI</th>
-                                        <th className="pb-3 font-semibold">Harga Jual</th>
-                                        <th className="pb-3 font-semibold">Harga Reseller</th>
-                                        <th className="pb-3 font-semibold text-center">Stok</th>
-                                        {authUser.role !== 'viewer' && <th className="pb-3 font-semibold text-right">Aksi</th>}
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300">
+                    </div>                    {/* Stock Table & Detail Split Panel */}
+                    <div className="w-full grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+                        
+                        {/* Table Column */}
+                        <div className={`rounded-none sm:rounded-lg border-x-0 sm:border border-y sm:border-y-0 border-border bg-transparent sm:bg-card shadow-none sm:shadow-sm text-card-foreground -mx-4 sm:mx-0 transition-all duration-300 ${
+                            selectedStockDetail ? 'hidden lg:block lg:col-span-2' : 'col-span-1 lg:col-span-3'
+                        }`}>
+                            <div className="p-0 sm:p-6">
+                                {/* Mobile View (Stacked Cards) */}
+                                <div className="md:hidden space-y-3 px-4 py-2">
                                     {filteredStocks.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={8} className="py-8 text-center text-gray-400">
-                                                Stok unit tidak ditemukan. Sesuaikan kategori atau kata kunci pencarian.
-                                            </td>
-                                        </tr>
+                                        <div className="py-8 text-center text-gray-400">
+                                            Stok unit tidak ditemukan.
+                                        </div>
                                     ) : (
-                                        filteredStocks.map((item) => (
-                                            <tr key={item.id} className="hover:bg-muted/50 dark:hover:bg-gray-900/50">
-                                                <td className="py-4">
-                                                    <p className="font-semibold text-foreground">{item.name}</p>
-                                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{item.category}</p>
-                                                </td>
-                                                <td className="py-4">
-                                                    <span className={`inline-flex rounded px-2 py-0.5 text-xs font-bold uppercase ${
-                                                        item.type === 'new' 
-                                                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded text-xs' 
-                                                            : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded text-xs'
-                                                    }`}>
-                                                        {item.type} {item.grade && `(${item.grade})`}
-                                                    </span>
-                                                </td>
-                                                <td className="py-4 text-xs">
-                                                    {item.category !== 'accessories' && item.category !== 'extra' ? (
-                                                        <span>
-                                                            {item.brand?.value || '-'} • {item.memory?.value || '-'} • {item.license?.value || '-'}
-                                                        </span>
-                                                    ) : (
-                                                        <span>Warna: {item.color?.value || '-'}</span>
-                                                    )}
-                                                </td>
-                                                <td className="py-4 font-mono text-xs">
-                                                    {item.serial_number ? (
-                                                        <div>
-                                                            <p>SN: {item.serial_number}</p>
-                                                            {item.imei_1 && <p className="text-gray-400">IMEI 1: {item.imei_1}</p>}
-                                                            {item.imei_2 && <p className="text-gray-400">IMEI 2: {item.imei_2}</p>}
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-gray-400">-</span>
-                                                    )}
-                                                </td>
-                                                <td className="py-4 font-bold text-indigo-600 dark:text-indigo-400">
-                                                    {formatCurrency(item.sell_price)}
-                                                </td>
-                                                <td className="py-4 text-emerald-600 dark:text-emerald-400 font-bold">
-                                                    {item.sell_price_reseller ? formatCurrency(item.sell_price_reseller) : '-'}
-                                                </td>
-                                                <td className="py-4 text-center font-bold">
-                                                    {item.qty} Pcs
-                                                </td>
-                                                {authUser.role !== 'viewer' && (
-                                                    <td className="py-4 text-right space-x-2">
-                                                        <button
-                                                            onClick={() => openCheckout(item)}
-                                                            className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition"
-                                                        >
-                                                            Jual
-                                                        </button>
-                                                        {authUser.role === 'superadmin' && (
-                                                            <button
-                                                                onClick={() => openTransfer(item)}
-                                                                className="rounded-lg border border-input px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-muted dark:border-input dark:text-gray-300 dark:hover:bg-gray-900 transition"
-                                                            >
-                                                                Mutasi
-                                                            </button>
-                                                        )}
-                                                    </td>
-                                                )}
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    {/* Stock Mutation & Approval Section */}
-                    <div className="rounded-lg border border-border bg-card p-6 shadow-sm text-card-foreground">
-                        <h3 className="text-lg font-semibold text-foreground mb-2">Riwayat & Persetujuan Mutasi Cabang</h3>
-                        <p className="text-xs text-muted-foreground mb-6">Berikut adalah usulan transfer barang masuk/keluar dari cabang Anda.</p>
-
-                        <div className="overflow-x-auto">
-                            <table className="w-full min-w-[800px] text-left border-collapse">
-                                <thead>
-                                    <tr className="border-b border-border dark:border-input text-xs font-bold uppercase tracking-wider text-gray-400">
-                                        <th className="pb-3 font-semibold">Unit</th>
-                                        <th className="pb-3 font-semibold">Dari Cabang</th>
-                                        <th className="pb-3 font-semibold">Ke Cabang</th>
-                                        <th className="pb-3 font-semibold">Pengaju</th>
-                                        <th className="pb-3 font-semibold">Status</th>
-                                        <th className="pb-3 font-semibold text-right">Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    {transfers.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={6} className="py-6 text-center text-gray-400">
-                                                Belum ada usulan mutasi terekam.
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        transfers.map((tr) => {
-                                            const isDestination = tr.to_store_id === authUser.store_id || authUser.role === 'superadmin';
-                                            const isTransit = tr.status === 'transit';
-                                            
+                                        filteredStocks.map((item) => {
+                                            const isSelected = selectedStockDetail?.id === item.id;
                                             return (
-                                                <tr key={tr.id} className="hover:bg-muted/50 dark:hover:bg-gray-900/50">
-                                                    <td className="py-4">
-                                                        <p className="font-semibold text-foreground">{tr.stock?.name}</p>
-                                                        <p className="text-[10px] text-gray-400 font-bold uppercase">{tr.stock?.serial_number}</p>
-                                                    </td>
-                                                    <td className="py-4">{tr.from_store?.name || 'Pusat'}</td>
-                                                    <td className="py-4 font-bold text-indigo-600 dark:text-indigo-400">{tr.to_store?.name}</td>
-                                                    <td className="py-4 text-xs">{tr.requester?.name || 'Sistem'}</td>
-                                                    <td className="py-4">
-                                                        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-bold ${
-                                                            tr.status === 'approved' 
-                                                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded text-xs' 
-                                                                : tr.status === 'transit' 
-                                                                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded text-xs'
-                                                                    : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded text-xs'
-                                                        }`}>
-                                                            {tr.status}
-                                                        </span>
-                                                    </td>
-                                                    <td className="py-4 text-right">
-                                                        {isTransit && isDestination ? (
-                                                            <button
-                                                                onClick={() => approveTransfer(tr.id)}
-                                                                className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition"
-                                                            >
-                                                                Terima Barang
-                                                            </button>
-                                                        ) : (
-                                                            <span className="text-xs text-gray-400">-</span>
-                                                        )}
-                                                    </td>
-                                                </tr>
+                                                <div
+                                                    key={item.id}
+                                                    onClick={() => setSelectedStockDetail(item)}
+                                                    className={`p-4 rounded-xl border border-border bg-card/45 dark:bg-gray-900/10 hover:bg-muted/30 dark:hover:bg-gray-900/30 transition cursor-pointer space-y-2 ${
+                                                        isSelected ? 'ring-2 ring-indigo-500 bg-indigo-500/5' : ''
+                                                    }`}
+                                                >
+                                                    <div className="flex justify-between items-start gap-3">
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className="font-semibold text-foreground truncate block text-sm" title={item.name}>
+                                                                {item.name}
+                                                            </p>
+                                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-0.5 truncate">
+                                                                {item.category} {item.brand?.value ? `• ${item.brand.value}` : ''} {item.memory?.value ? `• ${item.memory.value}` : ''}
+                                                            </p>
+                                                        </div>
+                                                        <div className="text-right flex-shrink-0">
+                                                            <p className="text-sm font-bold text-indigo-600 dark:text-indigo-400">
+                                                                {formatCurrency(item.sell_price)}
+                                                            </p>
+                                                            <p className="text-[11px] font-bold text-gray-500 mt-0.5">
+                                                                Stok: {item.qty} Pcs
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             );
                                         })
                                     )}
-                                </tbody>
-                            </table>
+                                </div>
+
+                                {/* Desktop View (Table) */}
+                                <div className="hidden md:block overflow-x-auto">
+                                    <table className="w-full min-w-0 text-left border-collapse text-sm">
+                                        <thead>
+                                            <tr className="border-b border-border dark:border-input text-xs font-bold uppercase tracking-wider text-gray-400">
+                                                <th className="pb-3 px-4 font-semibold text-left">Unit</th>
+                                                <th className="pb-3 px-4 font-semibold text-left">Harga</th>
+                                                <th className="pb-3 px-4 font-semibold text-center">Stok</th>
+                                                {authUser.role !== 'viewer' && <th className="pb-3 px-4 font-semibold text-right">Aksi</th>}
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300">
+                                            {filteredStocks.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={4} className="py-8 text-center text-gray-400 px-4">
+                                                        Stok unit tidak ditemukan.
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                filteredStocks.map((item) => {
+                                                    const isSelected = selectedStockDetail?.id === item.id;
+                                                    return (
+                                                        <tr 
+                                                            key={item.id} 
+                                                            onClick={() => setSelectedStockDetail(item)}
+                                                            className={`cursor-pointer transition duration-150 hover:bg-muted/50 dark:hover:bg-gray-900/50 ${
+                                                                isSelected ? 'bg-indigo-500/5 hover:bg-indigo-500/10' : ''
+                                                            }`}
+                                                        >
+                                                            <td className="py-2.5 px-4 text-left">
+                                                                <p className="font-semibold text-foreground truncate block max-w-xs" title={item.name}>
+                                                                    {item.name}
+                                                                </p>
+                                                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-0.5 truncate max-w-xs">
+                                                                    {item.category} {item.brand?.value ? `• ${item.brand.value}` : ''} {item.memory?.value ? `• ${item.memory.value}` : ''}
+                                                                </p>
+                                                            </td>
+                                                            <td className="py-2.5 px-4 font-bold text-indigo-600 dark:text-indigo-400 whitespace-nowrap text-left">
+                                                                {formatCurrency(item.sell_price)}
+                                                            </td>
+                                                            <td className="py-2.5 px-4 text-center font-bold whitespace-nowrap">
+                                                                {item.qty} Pcs
+                                                            </td>
+                                                            {authUser.role !== 'viewer' && (
+                                                                <td className="py-2.5 px-4 text-right" onClick={(e) => e.stopPropagation()}>
+                                                                    <div className="flex items-center justify-end gap-1.5">
+                                                                        <button
+                                                                            onClick={() => openCheckout(item)}
+                                                                            className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition whitespace-nowrap"
+                                                                        >
+                                                                            Jual
+                                                                        </button>
+                                                                        {authUser.role === 'superadmin' && (
+                                                                            <button
+                                                                                onClick={() => openTransfer(item)}
+                                                                                className="rounded-lg border border-input px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-muted dark:border-input dark:text-gray-300 dark:hover:bg-gray-900 transition whitespace-nowrap"
+                                                                            >
+                                                                                Mutasi
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                </td>
+                                                            )}
+                                                        </tr>
+                                                    );
+                                                })
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
+
+                        {/* Detail Panel Column */}
+                        {selectedStockDetail && (
+                            <div className="w-full lg:col-span-1 rounded-lg border border-border bg-card p-6 shadow-sm text-card-foreground space-y-6 self-start lg:sticky lg:top-4 transition-all duration-300">
+                                {/* Header / Breadcrumb & Close Button */}
+                                <div className="flex items-center justify-between border-b border-border dark:border-input pb-3">
+                                    <nav className="flex items-center text-[10px] font-bold uppercase tracking-wider text-gray-400 overflow-hidden" aria-label="Breadcrumb">
+                                        <span className="hover:text-foreground cursor-pointer whitespace-nowrap" onClick={() => setSelectedStockDetail(null)}>Selling</span>
+                                        <span className="mx-1.5 flex-shrink-0">/</span>
+                                        <span className="hover:text-foreground cursor-pointer whitespace-nowrap" onClick={() => setSelectedStockDetail(null)}>Detail</span>
+                                        <span className="mx-1.5 flex-shrink-0">/</span>
+                                        <span className="text-indigo-600 dark:text-indigo-400 truncate max-w-[120px]" title={selectedStockDetail.name}>{selectedStockDetail.name}</span>
+                                    </nav>
+                                    <button 
+                                        onClick={() => setSelectedStockDetail(null)}
+                                        className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-sm font-bold"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+
+                                {/* Content Info */}
+                                <div>
+                                    <h4 className="text-sm font-bold text-foreground">{selectedStockDetail.name}</h4>
+                                    <div className="flex gap-2 mt-2">
+                                        <span className="inline-flex rounded px-2 py-0.5 text-[10px] font-bold uppercase bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                                            {selectedStockDetail.type}
+                                        </span>
+                                        <span className="inline-flex rounded px-2 py-0.5 text-[10px] font-bold uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                            Available
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4 text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                    <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
+                                        <span className="text-gray-400 uppercase text-[10px]">Kategori</span>
+                                        <span className="text-right capitalize text-foreground">{selectedStockDetail.category}</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
+                                        <span className="text-gray-400 uppercase text-[10px]">Merek</span>
+                                        <span className="text-right text-foreground">{selectedStockDetail.brand?.value || '-'}</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
+                                        <span className="text-gray-400 uppercase text-[10px]">Warna</span>
+                                        <span className="text-right text-foreground">{selectedStockDetail.color?.value || '-'}</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
+                                        <span className="text-gray-400 uppercase text-[10px]">Memori</span>
+                                        <span className="text-right text-foreground">{selectedStockDetail.memory?.value || '-'}</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
+                                        <span className="text-gray-400 uppercase text-[10px]">Lisensi / Sinyal</span>
+                                        <span className="text-right text-foreground">{selectedStockDetail.license?.value || '-'}</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
+                                        <span className="text-gray-400 uppercase text-[10px]">Serial Number</span>
+                                        <span className="text-right font-mono text-foreground">{selectedStockDetail.serial_number || '-'}</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
+                                        <span className="text-gray-400 uppercase text-[10px]">IMEI</span>
+                                        <span className="text-right font-mono text-foreground">{selectedStockDetail.imei_1 || '-'}</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
+                                        <span className="text-gray-400 uppercase text-[10px]">Harga Jual</span>
+                                        <span className="text-right font-bold text-indigo-600 dark:text-indigo-400">
+                                            {formatCurrency(selectedStockDetail.sell_price)}
+                                        </span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
+                                        <span className="text-gray-400 uppercase text-[10px]">Garansi</span>
+                                        <span className="text-right text-foreground">{selectedStockDetail.warranty_duration_days} Hari</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
+                                        <span className="text-gray-400 uppercase text-[10px]">Supplier</span>
+                                        <span className="text-right text-foreground">{selectedStockDetail.supplier || '-'}</span>
+                                    </div>
+                                </div>
+
+                                {authUser.role !== 'viewer' && (
+                                    <div className="flex gap-3 pt-4 border-t border-border dark:border-input">
+                                        <button
+                                            onClick={() => openCheckout(selectedStockDetail)}
+                                            className="flex-1 rounded-xl bg-indigo-600 py-2.5 text-xs font-semibold text-white hover:bg-indigo-700 transition"
+                                        >
+                                            Proses Jual
+                                        </button>
+                                        {authUser.role === 'superadmin' && (
+                                            <button
+                                                onClick={() => openTransfer(selectedStockDetail)}
+                                                className="flex-1 rounded-xl border border-input py-2.5 text-xs font-semibold text-gray-700 hover:bg-muted dark:border-input dark:text-gray-300 dark:hover:bg-gray-900 transition"
+                                            >
+                                                Mutasi
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                 </div>
             </div>
 
-            {/* Mutasi / Transfer Modal */}
+            {/* Transfer Modal */}
             {isTransferOpen && selectedStock && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4">
                     <div className="w-full max-w-md rounded-lg bg-card p-6 shadow-sm dark:bg-background border dark:border-input">
@@ -570,18 +667,10 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                             </div>
 
                             <div className="flex gap-3 pt-4 border-t border-border dark:border-input">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsTransferOpen(false)}
-                                    className="flex-1 rounded-xl border border-input py-2.5 text-xs font-semibold text-gray-500 hover:bg-muted dark:border-input dark:hover:bg-gray-950"
-                                >
+                                <button type="button" onClick={() => setIsTransferOpen(false)} className="flex-1 rounded-xl border border-input py-2.5 text-xs font-semibold text-gray-500 hover:bg-muted dark:border-input dark:hover:bg-gray-950">
                                     Batal
                                 </button>
-                                <button
-                                    type="submit"
-                                    disabled={transferForm.processing}
-                                    className="flex-1 rounded-xl bg-indigo-600 py-2.5 text-xs font-semibold text-white hover:bg-indigo-700 transition"
-                                >
+                                <button type="submit" disabled={transferForm.processing} className="flex-1 rounded-xl bg-indigo-600 py-2.5 text-xs font-semibold text-white hover:bg-indigo-700 transition">
                                     {transferForm.processing ? 'Mengirim...' : 'Kirim Usulan'}
                                 </button>
                             </div>
@@ -602,12 +691,60 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                             <button onClick={() => setIsCheckoutOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
                         </div>
 
+                        {/* Global Error */}
+                        {(checkoutForm.errors as any).error && (
+                            <div className="mt-3 rounded-lg bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900 p-3 text-xs font-bold text-rose-600 dark:text-rose-400">
+                                {(checkoutForm.errors as any).error}
+                            </div>
+                        )}
+
                         <form onSubmit={submitCheckout} className="space-y-6 pt-4 max-h-[70vh] overflow-y-auto pr-2">
+                            {/* Branch Selection (Superadmin only) */}
+                            {authUser.role === 'superadmin' && (
+                                <div className="p-4 rounded-xl border border-dashed border-indigo-500/30 bg-indigo-500/5 space-y-2">
+                                    <label className="block text-xs font-bold uppercase text-indigo-600 dark:text-indigo-400 mb-1">
+                                        Cabang Penjualan (Superadmin Only)
+                                    </label>
+                                    <select
+                                        required
+                                        value={checkoutForm.data.store_id}
+                                        onChange={e => checkoutForm.setData('store_id', e.target.value)}
+                                        className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold text-gray-800 dark:border-input dark:bg-background dark:text-gray-100"
+                                    >
+                                        <option value="">-- Pilih Cabang --</option>
+                                        {storesFilter.map(s => (
+                                            <option key={s.id} value={s.id}>{s.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
                             {/* Buyer Info */}
                             <div className="space-y-4">
                                 <h5 className="text-sm font-semibold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
-                                    <User className="h-4 w-4" /> Data Pelanggan (Buyer)
+                                    <User className="h-4 w-4" /> Data Pelanggan
                                 </h5>
+
+                                {/* Existing Buyer Search */}
+                                {buyers.length > 0 && (
+                                    <div>
+                                        <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Cari Pelanggan Lama</label>
+                                        <select
+                                            onChange={(e) => {
+                                                const found = buyers.find(b => b.id.toString() === e.target.value);
+                                                if (found) selectBuyer(found);
+                                            }}
+                                            defaultValue=""
+                                            className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold text-gray-800 dark:border-input dark:bg-background dark:text-gray-100"
+                                        >
+                                            <option value="">-- Pilih pelanggan lama atau isi manual --</option>
+                                            {buyers.map(b => (
+                                                <option key={b.id} value={b.id}>{b.name} — {b.phone}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                     <div>
                                         <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Nama Lengkap</label>
@@ -616,9 +753,10 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                             required
                                             value={checkoutForm.data.buyer_name}
                                             onChange={e => checkoutForm.setData('buyer_name', e.target.value)}
-                                            className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold text-gray-800 dark:border-input dark:bg-background dark:text-gray-100"
+                                            className={`w-full rounded-xl border px-3.5 py-2 text-sm font-bold bg-card text-gray-800 dark:bg-background dark:text-gray-100 focus:outline-none ${checkoutForm.errors.buyer_name ? 'border-rose-400' : 'border-input dark:border-input'}`}
                                             placeholder="Contoh: Andi Wijaya"
                                         />
+                                        {checkoutForm.errors.buyer_name && <p className="mt-1 text-xs text-rose-500">{checkoutForm.errors.buyer_name}</p>}
                                     </div>
                                     <div>
                                         <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">No. HP (WhatsApp)</label>
@@ -626,10 +764,12 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                             type="text"
                                             required
                                             value={checkoutForm.data.buyer_phone}
-                                            onChange={e => checkoutForm.setData('buyer_phone', e.target.value)}
-                                            className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold text-gray-800 dark:border-input dark:bg-background dark:text-gray-100"
-                                            placeholder="Contoh: 08123456789"
+                                            onChange={e => checkoutForm.setData('buyer_phone', normalizePhone(e.target.value))}
+                                            className={`w-full rounded-xl border px-3.5 py-2 text-sm font-bold bg-card text-gray-800 dark:bg-background dark:text-gray-100 focus:outline-none ${checkoutForm.errors.buyer_phone ? 'border-rose-400' : 'border-input dark:border-input'}`}
+                                            placeholder="08xxxxxxxxxx"
                                         />
+                                        {checkoutForm.errors.buyer_phone && <p className="mt-1 text-xs text-rose-500">{checkoutForm.errors.buyer_phone}</p>}
+                                        <p className="text-[10px] text-gray-400 mt-0.5">Format: 08xxx / +62xxx / 62xxx → auto-convert</p>
                                     </div>
                                     <div className="sm:col-span-2">
                                         <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Alamat (Opsional)</label>
@@ -655,15 +795,17 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                         <input
                                             type="number"
                                             required
-                                            value={checkoutForm.data.items[0]?.actual_sell_price || 0}
+                                            min={0}
+                                            value={checkoutForm.data.items[0]?.actual_sell_price ?? ''}
                                             onChange={e => {
                                                 const items = [...checkoutForm.data.items];
-                                                items[0].actual_sell_price = parseFloat(e.target.value) || 0;
+                                                items[0].actual_sell_price = e.target.value === '' ? '' : parseFloat(e.target.value);
                                                 checkoutForm.setData('items', items);
                                             }}
-                                            className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold text-gray-800 dark:border-input dark:bg-background dark:text-gray-100"
+                                            className={`w-full rounded-xl border px-3.5 py-2 text-sm font-bold bg-card text-gray-800 dark:bg-background dark:text-gray-100 focus:outline-none ${checkoutForm.errors['items.0.actual_sell_price'] ? 'border-rose-400' : 'border-input dark:border-input'}`}
+                                            placeholder="Masukkan harga"
                                         />
-                                        <p className="text-[10px] text-gray-400 mt-1 font-bold">Harga default retail: {formatCurrency(selectedStock.sell_price)}</p>
+                                        <p className="text-[10px] text-gray-400 mt-1 font-bold">Default retail: {formatCurrency(selectedStock.sell_price)}</p>
                                     </div>
                                     <div>
                                         <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Metode Pembayaran</label>
@@ -699,9 +841,11 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                         <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Uang Muka / DP Booking (Opsional)</label>
                                         <input
                                             type="number"
-                                            value={checkoutForm.data.dp_amount}
-                                            onChange={e => checkoutForm.setData('dp_amount', parseFloat(e.target.value) || 0)}
+                                            min={0}
+                                            value={checkoutForm.data.dp_amount ?? ''}
+                                            onChange={e => checkoutForm.setData('dp_amount', e.target.value === '' ? '' : parseFloat(e.target.value))}
                                             className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold text-gray-800 dark:border-input dark:bg-background dark:text-gray-100"
+                                            placeholder="0"
                                         />
                                     </div>
                                     <div>
@@ -729,11 +873,12 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Komisi Affiliate (Affiliate Fee)</label>
+                                        <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Komisi Affiliate</label>
                                         <input
                                             type="number"
-                                            value={checkoutForm.data.affiliate_fee}
-                                            onChange={e => checkoutForm.setData('affiliate_fee', parseFloat(e.target.value) || 0)}
+                                            min={0}
+                                            value={checkoutForm.data.affiliate_fee ?? ''}
+                                            onChange={e => checkoutForm.setData('affiliate_fee', e.target.value === '' ? '' : parseFloat(e.target.value))}
                                             className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold text-gray-800 dark:border-input dark:bg-background dark:text-gray-100"
                                             placeholder="Nominal komisi"
                                         />
@@ -771,8 +916,8 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                                                 className="rounded-lg border border-input bg-card px-2 py-1 text-xs font-bold focus:outline-none dark:border-input dark:bg-background"
                                                             >
                                                                 <option value="buyer">Bebankan ke Pembeli</option>
-                                                                <option value="seller">Toko Tanggung (HPP Toko)</option>
-                                                                <option value="free_promotion">Promosi Free (Toko Serap Rp0)</option>
+                                                                <option value="seller">Toko Tanggung</option>
+                                                                <option value="free_promotion">Promosi Free</option>
                                                             </select>
                                                         </div>
                                                     )}
@@ -812,7 +957,7 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                                         checkoutForm.setData('trade_in', { ...ti, name: e.target.value });
                                                     }}
                                                     className="w-full rounded-xl border border-input bg-card px-3 py-2 text-sm font-bold text-gray-800 dark:border-input dark:bg-background"
-                                                    placeholder="Contoh: iPhone 12 Pro Max"
+                                                    placeholder="Contoh: iPhone 12 Pro"
                                                 />
                                             </div>
                                             <div>
@@ -820,12 +965,14 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                                 <input
                                                     type="number"
                                                     required
-                                                    value={checkoutForm.data.trade_in.buy_price}
+                                                    min={0}
+                                                    value={checkoutForm.data.trade_in.buy_price ?? ''}
                                                     onChange={e => {
                                                         const ti = checkoutForm.data.trade_in!;
-                                                        checkoutForm.setData('trade_in', { ...ti, buy_price: parseFloat(e.target.value) || 0 });
+                                                        checkoutForm.setData('trade_in', { ...ti, buy_price: e.target.value === '' ? '' : parseFloat(e.target.value) });
                                                     }}
                                                     className="w-full rounded-xl border border-input bg-card px-3 py-2 text-sm font-bold text-gray-800 dark:border-input dark:bg-background"
+                                                    placeholder="Nilai taksiran"
                                                 />
                                             </div>
                                             <div>
@@ -885,20 +1032,6 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                                 </select>
                                             </div>
                                             <div>
-                                                <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Grade (BNIB / A / B)</label>
-                                                <input
-                                                    type="text"
-                                                    required
-                                                    value={checkoutForm.data.trade_in.grade}
-                                                    onChange={e => {
-                                                        const ti = checkoutForm.data.trade_in!;
-                                                        checkoutForm.setData('trade_in', { ...ti, grade: e.target.value });
-                                                    }}
-                                                    className="w-full rounded-xl border border-input bg-card px-3 py-2 text-sm font-bold text-gray-800 dark:border-input dark:bg-background"
-                                                    placeholder="Contoh: Grade A+"
-                                                />
-                                            </div>
-                                            <div>
                                                 <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Serial Number HP Trade-In</label>
                                                 <input
                                                     type="text"
@@ -912,7 +1045,7 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">IMEI 1 HP Trade-In</label>
+                                                <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">IMEI HP Trade-In</label>
                                                 <input
                                                     type="text"
                                                     required
@@ -920,18 +1053,6 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                                     onChange={e => {
                                                         const ti = checkoutForm.data.trade_in!;
                                                         checkoutForm.setData('trade_in', { ...ti, imei_1: e.target.value });
-                                                    }}
-                                                    className="w-full rounded-xl border border-input bg-card px-3 py-2 text-sm font-bold text-gray-800 dark:border-input dark:bg-background"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">IMEI 2 HP Trade-In (Opsional)</label>
-                                                <input
-                                                    type="text"
-                                                    value={checkoutForm.data.trade_in.imei_2}
-                                                    onChange={e => {
-                                                        const ti = checkoutForm.data.trade_in!;
-                                                        checkoutForm.setData('trade_in', { ...ti, imei_2: e.target.value });
                                                     }}
                                                     className="w-full rounded-xl border border-input bg-card px-3 py-2 text-sm font-bold text-gray-800 dark:border-input dark:bg-background"
                                                 />
@@ -945,7 +1066,7 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                             <div className="bg-muted rounded-xl p-4 dark:bg-background border dark:border-input space-y-2">
                                 <div className="flex justify-between text-xs font-bold text-gray-500">
                                     <span>Harga Unit:</span>
-                                    <span>{formatCurrency(checkoutForm.data.items[0]?.actual_sell_price || 0)}</span>
+                                    <span>{formatCurrency(Number(checkoutForm.data.items[0]?.actual_sell_price) || 0)}</span>
                                 </div>
                                 {checkoutForm.data.extras.length > 0 && (
                                     <div className="flex justify-between text-xs font-bold text-gray-500">
@@ -960,7 +1081,7 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                 {checkoutForm.data.trade_in && (
                                     <div className="flex justify-between text-xs font-bold text-emerald-600">
                                         <span>Potongan Tukar Tambah:</span>
-                                        <span>-{formatCurrency(checkoutForm.data.trade_in.buy_price)}</span>
+                                        <span>-{formatCurrency(Number(checkoutForm.data.trade_in.buy_price) || 0)}</span>
                                     </div>
                                 )}
                                 <div className="border-t border-dashed border-input dark:border-input pt-2 mt-2 flex justify-between items-center">
@@ -989,6 +1110,67 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Success Modal with WA / Invoice buttons */}
+            {successData !== null && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="w-full max-w-sm rounded-2xl bg-card border border-border dark:bg-background dark:border-input shadow-2xl p-6 space-y-5 text-center">
+                        <div className="flex justify-center">
+                            <div className="h-16 w-16 rounded-full bg-emerald-500/10 border-2 border-emerald-500/30 flex items-center justify-center">
+                                <CheckCircle className="h-8 w-8 text-emerald-500" />
+                            </div>
+                        </div>
+                        <div>
+                            <h4 className="text-lg font-bold text-foreground">Transaksi Berhasil!</h4>
+                            <p className="text-xs text-muted-foreground mt-1">
+                                Pembayaran dari <span className="font-bold text-foreground">{successData.buyerName}</span> telah berhasil diproses.
+                            </p>
+                            <p className="text-sm font-bold text-indigo-600 dark:text-indigo-400 mt-1">
+                                Total: {formatCurrency(successData.total)}
+                            </p>
+                        </div>
+
+                        <div className="space-y-3">
+                            {/* Chat WA */}
+                            <button
+                                onClick={() => openWAChat(successData.buyerPhone, successData.buyerName)}
+                                className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-500 py-3 text-sm font-bold text-white hover:bg-emerald-600 transition"
+                            >
+                                <MessageCircle className="h-4 w-4" /> Chat WA Pembeli
+                            </button>
+
+                            {/* Send Invoice via WA */}
+                            {successData.invoiceNumber && (
+                                <button
+                                    onClick={() => openWAInvoice(successData.buyerPhone, successData.buyerName, successData.invoiceNumber, successData.total)}
+                                    className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white hover:bg-indigo-700 transition"
+                                >
+                                    <Send className="h-4 w-4" /> Kirim Invoice via WA
+                                </button>
+                            )}
+
+                            {/* View Invoice */}
+                            {successData.invoiceNumber && (
+                                <a
+                                    href={`/invoice/${successData.invoiceNumber}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="w-full flex items-center justify-center gap-2 rounded-xl border border-input py-3 text-sm font-bold text-foreground hover:bg-muted transition"
+                                >
+                                    <ExternalLink className="h-4 w-4" /> Lihat Invoice Online
+                                </a>
+                            )}
+
+                            <button
+                                onClick={() => setSuccessData(null)}
+                                className="w-full rounded-xl py-2.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition"
+                            >
+                                Tutup
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

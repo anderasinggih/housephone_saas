@@ -50,11 +50,20 @@ class SaleController extends Controller
 
     public function checkout(Request $request): RedirectResponse
     {
+        if ($request->has('buyer_phone')) {
+            $phone = $request->input('buyer_phone');
+            $phone = preg_replace('/[^0-9+]/', '', $phone);
+            $phone = preg_replace('/^\+62/', '0', $phone);
+            $phone = preg_replace('/^62/', '0', $phone);
+            $request->merge(['buyer_phone' => $phone]);
+        }
+
         if ($request->has('affiliate_user_id') && $request->input('affiliate_user_id') === '') {
             $request->merge(['affiliate_user_id' => null]);
         }
 
         $request->validate([
+            'store_id' => 'nullable|exists:stores,id',
             'buyer_name' => 'required|string',
             'buyer_phone' => 'required|string',
             'buyer_address' => 'nullable|string',
@@ -79,10 +88,8 @@ class SaleController extends Controller
             'trade_in.color_id' => 'required_with:trade_in|exists:dynamic_parameter_values,id',
             'trade_in.memory_id' => 'required_with:trade_in|exists:dynamic_parameter_values,id',
             'trade_in.license_id' => 'required_with:trade_in|exists:dynamic_parameter_values,id',
-            'trade_in.grade' => 'required_with:trade_in|string',
             'trade_in.serial_number' => 'required_with:trade_in|string|unique:stocks,serial_number',
             'trade_in.imei_1' => 'required_with:trade_in|string|unique:stocks,imei_1',
-            'trade_in.imei_2' => 'nullable|string|unique:stocks,imei_2',
             'trade_in.buy_price' => 'required_with:trade_in|numeric|min:0', // nilai taksiran beli toko
             
             // Extras/Add-ons (optional)
@@ -95,6 +102,9 @@ class SaleController extends Controller
 
         $user = $request->user();
         $storeId = $user->store_id;
+        if ($user->role === 'superadmin' && $request->filled('store_id')) {
+            $storeId = $request->input('store_id');
+        }
         
         // Find active shift
         $activeShift = DB::table('shifts')
@@ -154,20 +164,18 @@ class SaleController extends Controller
                 // Create new stock unit in inventory as second-hand available stock
                 $tradeInStock = Stock::create([
                     'store_id' => $storeId,
-                    'category' => 'iphone', // default category, should be adjusted or verified
+                    'category' => 'iphone', // default category
                     'type' => 'second',
                     'name' => $tradeIn['name'],
                     'brand_id' => $tradeIn['brand_id'],
                     'color_id' => $tradeIn['color_id'],
                     'memory_id' => $tradeIn['memory_id'],
                     'license_id' => $tradeIn['license_id'],
-                    'grade' => $tradeIn['grade'],
                     'serial_number' => $tradeIn['serial_number'],
                     'imei_1' => $tradeIn['imei_1'],
-                    'imei_2' => $tradeIn['imei_2'] ?? null,
                     'supplier' => 'Trade-In Customer: ' . $buyer->name,
                     'buy_price' => $tradeIn['buy_price'],
-                    'sell_price' => $tradeIn['buy_price'] * 1.15, // default markup recommendation
+                    'sell_price' => $tradeIn['buy_price'] * 1.15,
                     'qty' => 1,
                     'status' => 'available',
                 ]);
@@ -416,5 +424,14 @@ class SaleController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Status klaim garansi servis diperbarui.');
+    }
+
+    public function publicInvoice($invoiceNumber)
+    {
+        $sale = Sale::with(['buyer', 'store', 'user', 'items.stock.brand', 'extras.extra'])
+            ->where('invoice_number', $invoiceNumber)
+            ->firstOrFail();
+
+        return view('invoice.public', compact('sale'));
     }
 }

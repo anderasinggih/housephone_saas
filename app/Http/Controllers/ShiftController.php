@@ -36,11 +36,33 @@ class ShiftController extends Controller
         // Get active store if assigned
         $myStore = Store::find($user->store_id);
 
+        // Fetch attendance statistics
+        if ($user->role === 'superadmin') {
+            $attendanceStats = Attendance::with('user')
+                ->select('user_id', DB::raw('count(id) as total_days'), DB::raw('sum(late_minutes) as total_late_minutes'), DB::raw('sum(work_minutes) as total_work_minutes'))
+                ->groupBy('user_id')
+                ->get();
+        } else {
+            $attendanceStats = Attendance::where('user_id', $user->id)
+                ->select(DB::raw('count(id) as total_days'), DB::raw('sum(late_minutes) as total_late_minutes'), DB::raw('sum(work_minutes) as total_work_minutes'))
+                ->first();
+        }
+
+        $generalSettings = \App\Models\GeneralSetting::first() ?? \App\Models\GeneralSetting::create();
+        $employeeSchedules = \App\Models\EmployeeSchedule::with(['user', 'store'])->get();
+        $stores = Store::all();
+        $employees = \App\Models\User::where('role', 'karyawan')->get();
+
         return Inertia::render('Shifts/ShiftAttendance', [
             'activeShift' => $activeShift,
             'activeAttendance' => $activeAttendance,
             'myStore' => $myStore,
             'shifts' => $shifts,
+            'attendanceStats' => $attendanceStats,
+            'generalSettings' => $generalSettings,
+            'employeeSchedules' => $employeeSchedules,
+            'stores' => $stores,
+            'employees' => $employees,
         ]);
     }
 
@@ -73,13 +95,37 @@ class ShiftController extends Controller
             cos($latFrom) * cos($latTo) * pow(sin($lonDelta / 2), 2)));
         $distance = $angle * $earthRadius;
 
-        // Bypass geofence check if in local environment
-        $isLocal = config('app.env') === 'local';
-        if (!$isLocal && $distance > $store->geofence_radius) {
-            return redirect()->back()->withErrors(['error' => 'Absensi ditolak. Anda berada di luar radius toko (' . round($distance) . 'm dari lokasi toko).']);
+        $settings = \App\Models\GeneralSetting::first() ?? \App\Models\GeneralSetting::create();
+        
+        // Check if geofence is enabled in general settings
+        $geofenceEnabled = $settings->geofence_lock_enabled;
+        if ($geofenceEnabled) {
+            $isLocal = config('app.env') === 'local';
+            if (!$isLocal && $distance > $store->geofence_radius) {
+                return redirect()->back()->withErrors(['error' => 'Absensi ditolak. Anda berada di luar radius toko (' . round($distance) . 'm dari lokasi toko).']);
+            }
         }
 
-        DB::transaction(function () use ($request, $user, $store) {
+        // Calculate late minutes
+        $schedule = \App\Models\EmployeeSchedule::where('user_id', $user->id)
+            ->where('store_id', $user->store_id)
+            ->first();
+
+        $workStart = $schedule && $schedule->work_start_time ? $schedule->work_start_time : $settings->work_start_time;
+        $graceMinutes = $schedule && !is_null($schedule->grace_period_minutes) ? $schedule->grace_period_minutes : $settings->grace_period_minutes;
+
+        $now = now();
+        $workStartDateTime = \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $now->toDateString() . ' ' . $workStart);
+        
+        $lateMinutes = 0;
+        if ($now->greaterThan($workStartDateTime)) {
+            $diffInMinutes = $now->diffInMinutes($workStartDateTime);
+            if ($diffInMinutes > $graceMinutes) {
+                $lateMinutes = $diffInMinutes;
+            }
+        }
+
+        DB::transaction(function () use ($request, $user, $store, $lateMinutes) {
             // Open shift
             $shift = Shift::create([
                 'store_id' => $store->id,
@@ -97,13 +143,15 @@ class ShiftController extends Controller
                 'clock_in_lat' => $request->input('latitude'),
                 'clock_in_lng' => $request->input('longitude'),
                 'status' => 'present',
+                'late_minutes' => $lateMinutes,
             ]);
 
             ActivityLog::log('shift_clock_in', Shift::class, $shift->id, [
                 'store_name' => $store->name,
                 'start_cash' => $shift->start_cash,
                 'latitude' => $request->input('latitude'),
-                'longitude' => $request->input('longitude')
+                'longitude' => $request->input('longitude'),
+                'late_minutes' => $lateMinutes
             ]);
         });
 
@@ -124,6 +172,32 @@ class ShiftController extends Controller
 
         if (!$shift || !$attendance) {
             return redirect()->back()->withErrors(['error' => 'Tidak ada shift atau absensi aktif ditemukan.']);
+        }
+
+        $settings = \App\Models\GeneralSetting::first() ?? \App\Models\GeneralSetting::create();
+        $geofenceEnabled = $settings->geofence_lock_enabled;
+        
+        if ($geofenceEnabled) {
+            $store = Store::find($attendance->store_id);
+            if ($store) {
+                $earthRadius = 6371000;
+                $latFrom = deg2rad($request->input('latitude'));
+                $lonFrom = deg2rad($request->input('longitude'));
+                $latTo = deg2rad($store->latitude);
+                $lonTo = deg2rad($store->longitude);
+
+                $latDelta = $latTo - $latFrom;
+                $lonDelta = $lonTo - $lonFrom;
+
+                $angle = 2 * asin(sqrt(pow(sin($latDelta / 2), 2) +
+                    cos($latFrom) * cos($latTo) * pow(sin($lonDelta / 2), 2)));
+                $distance = $angle * $earthRadius;
+
+                $isLocal = config('app.env') === 'local';
+                if (!$isLocal && $distance > $store->geofence_radius) {
+                    return redirect()->back()->withErrors(['error' => 'Absensi ditolak. Anda berada di luar radius toko (' . round($distance) . 'm dari lokasi toko).']);
+                }
+            }
         }
 
         DB::transaction(function () use ($request, $user, $shift, $attendance) {
@@ -161,17 +235,21 @@ class ShiftController extends Controller
                 'closed_at' => now(),
             ]);
 
+            $workMinutes = now()->diffInMinutes($attendance->clock_in);
+
             $attendance->update([
                 'clock_out' => now(),
                 'clock_out_lat' => $request->input('latitude'),
                 'clock_out_lng' => $request->input('longitude'),
+                'work_minutes' => $workMinutes,
             ]);
 
             ActivityLog::log('shift_clock_out', Shift::class, $shift->id, [
                 'end_cash' => $shift->end_cash,
                 'difference' => $shift->difference,
                 'latitude' => $request->input('latitude'),
-                'longitude' => $request->input('longitude')
+                'longitude' => $request->input('longitude'),
+                'work_minutes' => $workMinutes
             ]);
         });
 

@@ -16,7 +16,9 @@ class Attendance extends Model
         'clock_in_lng',
         'clock_out_lat',
         'clock_out_lng',
-        'status'
+        'status',
+        'late_minutes',
+        'work_minutes',
     ];
 
     protected $casts = [
