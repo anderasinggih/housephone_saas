@@ -312,4 +312,52 @@ class StockController extends Controller
             'parameters' => $parameters,
         ]);
     }
+
+    public function update(Request $request, Stock $stock): RedirectResponse
+    {
+        if ($request->user()->role !== 'superadmin') {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $validated = $request->validate([
+            'store_id' => 'required|exists:stores,id',
+            'category' => 'required|in:iphone,android,accessories,extra',
+            'type' => 'required|in:new,second',
+            'name' => 'required|string|max:255',
+            'brand_id' => 'nullable|exists:dynamic_parameter_values,id',
+            'color_id' => 'nullable|exists:dynamic_parameter_values,id',
+            'memory_id' => 'nullable|exists:dynamic_parameter_values,id',
+            'license_id' => 'nullable|exists:dynamic_parameter_values,id',
+            'serial_number' => 'nullable|string|max:255',
+            'imei_1' => 'nullable|string|max:255',
+            'supplier' => 'nullable|string|max:255',
+            'warranty_duration_days' => 'required|integer|min:0',
+            'buy_price' => 'required|numeric|min:0',
+            'sell_price' => 'required|numeric|min:0',
+            'sell_price_reseller' => 'nullable|numeric|min:0',
+            'qty' => 'required|integer|min:1',
+            'status' => 'required|in:available,transit,sold',
+        ]);
+
+        $oldValues = $stock->toArray();
+        $stock->update($validated);
+
+        ActivityLog::log('stock_updated', Stock::class, $stock->id, $validated, $oldValues);
+
+        return redirect()->back()->with('success', 'Stok unit berhasil diperbarui.');
+    }
+
+    public function destroy(Request $request, Stock $stock): RedirectResponse
+    {
+        if ($request->user()->role !== 'superadmin') {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $oldValues = $stock->toArray();
+        $stock->delete();
+
+        ActivityLog::log('stock_deleted', Stock::class, $stock->id, null, $oldValues);
+
+        return redirect()->back()->with('success', 'Stok unit berhasil dihapus.');
+    }
 }

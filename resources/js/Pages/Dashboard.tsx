@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
 import { 
     TrendingUp, 
@@ -244,8 +244,11 @@ export default function Dashboard({
     recentSales, 
     topProducts, 
     activeStoreName,
-    filters 
+    filters,
 }: DashboardProps) {
+    const authUser = usePage().props.auth.user as any;
+    const isKaryawan = authUser.role === 'karyawan';
+
     const formatIDR = (val: number) => {
         return new Intl.NumberFormat('id-ID', {
             style: 'currency',
@@ -327,28 +330,32 @@ export default function Dashboard({
                             <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">ALL TIME SUMMARY</h3>
                             <span className="text-[10px] font-bold text-muted-foreground">Waktu: {currentTime || 'Loading...'}</span>
                         </div>
-                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                        <div className={`grid grid-cols-2 gap-3 ${isKaryawan ? 'sm:grid-cols-2 max-w-2xl' : 'sm:grid-cols-5'}`}>
                             <div className="rounded-lg border border-border bg-card p-4 text-card-foreground shadow-sm">
                                 <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Revenue All Time</p>
                                 <h3 className="text-lg sm:text-xl font-extrabold tracking-tight text-foreground mt-1">{formatIDR(allTimeStats.revenue)}</h3>
                                 <p className="mt-2 text-[10px] font-bold text-muted-foreground leading-normal">Total omset sepanjang masa</p>
                             </div>
-                            <div className="rounded-lg border border-border bg-card p-4 text-card-foreground shadow-sm">
-                                <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Actual Profit All Time</p>
-                                <h3 className="text-lg sm:text-xl font-extrabold tracking-tight text-emerald-600 dark:text-emerald-400 mt-1">{formatIDR(allTimeStats.actualProfit)}</h3>
-                                <p className="mt-2 text-[10px] font-bold text-muted-foreground leading-normal">Laba kotor sepanjang masa</p>
-                            </div>
-                            <div className="rounded-lg border border-border bg-card p-4 text-card-foreground shadow-sm">
-                                <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Affiliator Fee All Time</p>
-                                <h3 className="text-lg sm:text-xl font-extrabold tracking-tight text-amber-600 dark:text-amber-400 mt-1">{formatIDR(allTimeStats.affiliatorFee)}</h3>
-                                <p className="mt-2 text-[10px] font-bold text-muted-foreground leading-normal">Total komisi afiliasi terbayar</p>
-                            </div>
-                            <div className="rounded-lg border border-border bg-card p-4 text-card-foreground shadow-sm">
-                                <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Net Profit All Time</p>
-                                <h3 className="text-lg sm:text-xl font-extrabold tracking-tight text-primary mt-1">{formatIDR(allTimeStats.netProfit)}</h3>
-                                <p className="mt-2 text-[10px] font-bold text-muted-foreground leading-normal">Laba bersih sepanjang masa</p>
-                            </div>
-                            <div className="rounded-lg border border-border bg-card p-4 text-card-foreground shadow-sm col-span-2 sm:col-span-1">
+                            {!isKaryawan && (
+                                <>
+                                    <div className="rounded-lg border border-border bg-card p-4 text-card-foreground shadow-sm">
+                                        <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Actual Profit All Time</p>
+                                        <h3 className="text-lg sm:text-xl font-extrabold tracking-tight text-emerald-600 dark:text-emerald-400 mt-1">{formatIDR(allTimeStats.actualProfit)}</h3>
+                                        <p className="mt-2 text-[10px] font-bold text-muted-foreground leading-normal">Laba kotor sepanjang masa</p>
+                                    </div>
+                                    <div className="rounded-lg border border-border bg-card p-4 text-card-foreground shadow-sm">
+                                        <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Affiliator Fee All Time</p>
+                                        <h3 className="text-lg sm:text-xl font-extrabold tracking-tight text-amber-600 dark:text-amber-400 mt-1">{formatIDR(allTimeStats.affiliatorFee)}</h3>
+                                        <p className="mt-2 text-[10px] font-bold text-muted-foreground leading-normal">Total komisi afiliasi terbayar</p>
+                                    </div>
+                                    <div className="rounded-lg border border-border bg-card p-4 text-card-foreground shadow-sm">
+                                        <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Net Profit All Time</p>
+                                        <h3 className="text-lg sm:text-xl font-extrabold tracking-tight text-primary mt-1">{formatIDR(allTimeStats.netProfit)}</h3>
+                                        <p className="mt-2 text-[10px] font-bold text-muted-foreground leading-normal">Laba bersih sepanjang masa</p>
+                                    </div>
+                                </>
+                            )}
+                            <div className={`rounded-lg border border-border bg-card p-4 text-card-foreground shadow-sm ${isKaryawan ? '' : 'col-span-2 sm:col-span-1'}`}>
                                 <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Sold Items All Time</p>
                                 <h3 className="text-lg sm:text-xl font-extrabold tracking-tight text-foreground mt-1">{allTimeStats.soldItems} Unit</h3>
                                 <p className="mt-2 text-[10px] font-bold text-muted-foreground leading-normal">Total item terjual sepanjang masa</p>
@@ -422,71 +429,88 @@ export default function Dashboard({
                     </div>
 
                     {/* Stat Grid for the Selected Period */}
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                    <div className={`grid grid-cols-1 gap-3 ${isKaryawan ? 'sm:grid-cols-2 max-w-2xl' : 'sm:grid-cols-2 lg:grid-cols-5'}`}>
                         <StatCard 
                             title={`Omset (${getMonthName(filters.month)} ${filters.year})`} 
                             value={stats.totalRevenue} 
                             description="Total pendapatan dari penjualan selesai + addon berbayar"
                             icon={<Coins className="h-5 w-5" />}
                         />
-                        <StatCard 
-                            title={`HPP (${getMonthName(filters.month)})`} 
-                            value={stats.totalHpp} 
-                            description="Harga beli awal stok HP & aksesoris terjual + addon terserap"
-                            icon={<Smartphone className="h-5 w-5" />}
-                        />
-                        <StatCard 
-                            title="Klaim Garansi" 
-                            value={stats.totalRepairs} 
-                            description="Biaya perbaikan/klaim garansi yang disetujui"
-                            icon={<Wrench className="h-5 w-5" />}
-                        />
-                        <StatCard 
-                            title="Restocking Fees" 
-                            value={stats.totalReturnPenalty} 
-                            description="Total denda pemotongan pengembalian barang (10%)"
-                            icon={<RotateCcw className="h-5 w-5" />}
-                        />
-                        <StatCard 
-                            title="Laba Bersih" 
-                            value={stats.netProfit} 
-                            description="Laba = Omset - HPP - Klaim + Restocking Fees"
-                            icon={<TrendingUp className="h-5 w-5" />}
-                        />
+                        {isKaryawan ? (
+                            <div className="rounded-lg border border-border bg-card p-4 text-card-foreground shadow-sm flex items-center justify-between">
+                                <div>
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground font-bold">Item Terjual ({getMonthName(filters.month)})</p>
+                                    <h3 className="text-xl font-extrabold tracking-tight text-foreground mt-1">{stats.soldItemsCount} Unit</h3>
+                                    <p className="mt-2 text-[10px] text-muted-foreground leading-normal">Total unit terinput pada periode ini</p>
+                                </div>
+                                <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-500">
+                                    <Smartphone className="h-5 w-5" />
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                <StatCard 
+                                    title={`HPP (${getMonthName(filters.month)})`} 
+                                    value={stats.totalHpp} 
+                                    description="Harga beli awal stok HP & aksesoris terjual + addon terserap"
+                                    icon={<Smartphone className="h-5 w-5" />}
+                                />
+                                <StatCard 
+                                    title="Klaim Garansi" 
+                                    value={stats.totalRepairs} 
+                                    description="Biaya perbaikan/klaim garansi yang disetujui"
+                                    icon={<Wrench className="h-5 w-5" />}
+                                />
+                                <StatCard 
+                                    title="Restocking Fees" 
+                                    value={stats.totalReturnPenalty} 
+                                    description="Total denda pemotongan pengembalian barang (10%)"
+                                    icon={<RotateCcw className="h-5 w-5" />}
+                                />
+                                <StatCard 
+                                    title="Laba Bersih" 
+                                    value={stats.netProfit} 
+                                    description="Laba = Omset - HPP - Klaim + Restocking Fees"
+                                    icon={<TrendingUp className="h-5 w-5" />}
+                                />
+                            </>
+                        )}
                     </div>
 
                     {/* Breakdown Visualizer */}
-                    <div className="rounded-lg border border-border bg-card p-4 shadow-sm text-card-foreground">
-                        <h4 className="text-xs font-bold text-foreground">Aliran Finansial & HPP ({getMonthName(filters.month)} {filters.year})</h4>
-                        <p className="text-[10px] font-bold text-muted-foreground mb-4 mt-0.5">Visualisasi proporsi HPP, Pengeluaran Garansi, dan Laba Bersih dari Total Omset.</p>
-                        
-                        <div className="relative h-4 w-full overflow-hidden rounded-full bg-muted flex">
-                            <div style={{ width: `${hppPercent}%` }} className="bg-amber-500 transition-all duration-500" title={`HPP: ${hppPercent.toFixed(1)}%`} />
-                            <div style={{ width: `${repairPercent}%` }} className="bg-rose-500 transition-all duration-500" title={`Biaya Perbaikan: ${repairPercent.toFixed(1)}%`} />
-                            <div style={{ width: `${netProfitPercent}%` }} className="bg-cyan-500 transition-all duration-500" title={`Laba Bersih: ${netProfitPercent.toFixed(1)}%`} />
-                        </div>
+                    {!isKaryawan && (
+                        <div className="rounded-lg border border-border bg-card p-4 shadow-sm text-card-foreground">
+                            <h4 className="text-xs font-bold text-foreground">Aliran Finansial & HPP ({getMonthName(filters.month)} {filters.year})</h4>
+                            <p className="text-[10px] font-bold text-muted-foreground mb-4 mt-0.5">Visualisasi proporsi HPP, Pengeluaran Garansi, dan Laba Bersih dari Total Omset.</p>
+                            
+                            <div className="relative h-4 w-full overflow-hidden rounded-full bg-muted flex">
+                                <div style={{ width: `${hppPercent}%` }} className="bg-amber-500 transition-all duration-500" title={`HPP: ${hppPercent.toFixed(1)}%`} />
+                                <div style={{ width: `${repairPercent}%` }} className="bg-rose-500 transition-all duration-500" title={`Biaya Perbaikan: ${repairPercent.toFixed(1)}%`} />
+                                <div style={{ width: `${netProfitPercent}%` }} className="bg-cyan-500 transition-all duration-500" title={`Laba Bersih: ${netProfitPercent.toFixed(1)}%`} />
+                            </div>
 
-                        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                            <div className="flex items-center gap-2">
-                                <div className="h-3 w-3 rounded bg-amber-500" />
-                                <span className="text-[10px] font-bold text-muted-foreground">Total HPP ({formatIDR(stats.totalHpp)})</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <div className="h-3 w-3 rounded bg-rose-500" />
-                                <span className="text-[10px] font-bold text-muted-foreground">Biaya Garansi ({formatIDR(stats.totalRepairs)})</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <div className="h-3 w-3 rounded bg-cyan-500" />
-                                <span className="text-[10px] font-bold text-muted-foreground">Laba Bersih ({formatIDR(stats.netProfit)})</span>
+                            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                                <div className="flex items-center gap-2">
+                                    <div className="h-3 w-3 rounded bg-amber-500" />
+                                    <span className="text-[10px] font-bold text-muted-foreground">Total HPP ({formatIDR(stats.totalHpp)})</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="h-3 w-3 rounded bg-rose-500" />
+                                    <span className="text-[10px] font-bold text-muted-foreground">Biaya Garansi ({formatIDR(stats.totalRepairs)})</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="h-3 w-3 rounded bg-cyan-500" />
+                                    <span className="text-[10px] font-bold text-muted-foreground">Laba Bersih ({formatIDR(stats.netProfit)})</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* Donut Charts Row: Type, Payment, and Affiliator */}
-                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                    <div className={`grid grid-cols-1 gap-4 ${isKaryawan ? 'lg:grid-cols-2' : 'lg:grid-cols-3'}`}>
                         <DonutChart data={formattedTypeData} title="Model Terlaris" />
                         <DonutChart data={formattedPaymentData} title="Metode Pembayaran" />
-                        <DonutChart data={formattedAffiliatorData} title="Komisi Afiliasi" />
+                        {!isKaryawan && <DonutChart data={formattedAffiliatorData} title="Komisi Afiliasi" />}
                     </div>
 
                     {/* Proportional Trend Chart (Bar Chart instead of Line Chart) */}
