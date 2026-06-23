@@ -554,7 +554,7 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                     </nav>
                                     <button 
                                         onClick={() => setSelectedStockDetail(null)}
-                                        className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-sm font-bold"
+                                        className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1.5 hover:bg-muted rounded-lg text-lg transition-colors font-bold"
                                     >
                                         ✕
                                     </button>
@@ -688,7 +688,7 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                 <h4 className="text-xl font-semibold text-foreground">Formulir Checkout Kasir</h4>
                                 <p className="text-xs text-gray-400">Unit: {selectedStock.name}</p>
                             </div>
-                            <button onClick={() => setIsCheckoutOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+                            <button onClick={() => setIsCheckoutOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1.5 hover:bg-muted rounded-lg text-lg transition-colors">✕</button>
                         </div>
 
                         {/* Global Error */}

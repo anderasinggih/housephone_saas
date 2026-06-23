@@ -317,10 +317,9 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                     {/* TAB 1: LIST STOCKS */}
                     {!isAddingNewStock ? (
                         <div className="w-full flex flex-col lg:flex-row gap-6 items-stretch lg:items-start">
-                            
-                            {/* Table Column */}
-                            <div className={`rounded-none sm:rounded-lg border-x-0 sm:border border-y sm:border-y-0 border-border bg-transparent sm:bg-card shadow-none sm:shadow-sm text-card-foreground -mx-4 sm:mx-0 transition-all duration-300 ${
-                                selectedStockDetail ? 'hidden lg:block lg:w-2/3' : 'w-full'
+                                               {/* Table Column */}
+                            <div className={`rounded-none sm:rounded-lg border-x-0 sm:border border-y sm:border-y-0 border-border bg-transparent sm:bg-card shadow-none sm:shadow-sm text-card-foreground -mx-4 sm:mx-0 w-[calc(100%+2rem)] sm:w-full transition-all duration-300 ${
+                                selectedStockDetail ? 'hidden lg:block lg:w-2/3' : ''
                             }`}>
                                 <div className="p-0 sm:p-6">
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-4 sm:px-0 pt-4 sm:pt-0 mb-4">
@@ -367,19 +366,19 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                     const colorText = item.color?.value || '-';
                                                     const memoryText = item.memory?.value || '-';
                                                     const licenseText = item.license?.value || '-';
-
+ 
                                                     const buyPrice = item.buy_price ? parseFloat(item.buy_price as any) : 0;
                                                     const sellPrice = item.sell_price ? parseFloat(item.sell_price as any) : 0;
                                                     const actualSellPrice = (item.status === 'sold' && saleItem?.actual_sell_price) ? parseFloat(saleItem.actual_sell_price as any) : 0;
                                                     const actualAffiliateFee = (item.status === 'sold' && sale?.affiliate_fee) ? parseFloat(sale.affiliate_fee as any) : 0;
                                                     const actualProfit = actualSellPrice > 0 ? (actualSellPrice - buyPrice - actualAffiliateFee) : 0;
-
+ 
                                                     const soldIn = (item.status === 'sold' && sale?.invoice_number) ? sale.invoice_number : '-';
                                                     const affiliatorName = (item.status === 'sold' && sale?.affiliate_user?.name) ? sale.affiliate_user.name : '-';
                                                     const buyerName = (item.status === 'sold' && sale?.buyer?.name) ? sale.buyer.name : '-';
-
+ 
                                                     const isSelected = selectedStockDetail?.id === item.id;
-
+ 
                                                     return (
                                                         <tr 
                                                             key={item.id} 
@@ -447,7 +446,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                 </div>
                                 </div>
                             </div>
-
+ 
                             {/* Detail Panel */}
                             {selectedStockDetail && (
                                 <div className="w-full lg:w-1/3 rounded-lg border border-border bg-card p-6 shadow-sm text-card-foreground space-y-6 self-start lg:sticky lg:top-4 transition-all duration-300">
@@ -463,7 +462,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                         </nav>
                                         <button 
                                             onClick={() => setSelectedStockDetail(null)}
-                                            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-sm font-bold"
+                                            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1.5 hover:bg-muted rounded-lg text-lg transition-colors font-bold"
                                         >
                                             ✕
                                         </button>
@@ -907,16 +906,16 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
 
                     {/* Edit Stock Modal */}
                     {isEditModalOpen && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
-                            <div className="w-full max-w-2xl rounded-lg bg-card p-6 shadow-sm dark:bg-background border dark:border-input my-8">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 overflow-y-auto">
+                            <div className="w-full max-w-2xl rounded-none sm:rounded-lg bg-background sm:bg-card p-4 sm:p-6 shadow-none sm:shadow-sm dark:bg-background border-0 sm:border border-border dark:border-input my-0 sm:my-8 min-h-screen sm:min-h-0 flex flex-col justify-between sm:justify-start">
                                 <div className="flex justify-between items-center pb-4 border-b border-border dark:border-input">
                                     <h4 className="text-lg font-semibold text-foreground">Edit Unit Stok</h4>
-                                    <button onClick={() => setIsEditModalOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+                                    <button onClick={() => setIsEditModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1.5 hover:bg-muted rounded-lg text-lg transition-colors">✕</button>
                                 </div>
 
-                                <form onSubmit={submitEdit} className="space-y-6 pt-4 max-h-[70vh] overflow-y-auto pr-2">
+                                <form onSubmit={submitEdit} className="space-y-6 pt-4 max-h-[85vh] sm:max-h-[70vh] overflow-y-auto pr-2">
                                     {/* Section 1: Lokasi & Kategori */}
-                                    <div className="p-4 rounded-xl border border-border dark:border-input bg-muted/20 space-y-4">
+                                    <div className="p-0 sm:p-4 rounded-none sm:rounded-xl border-0 sm:border border-transparent sm:border-border dark:sm:border-input bg-transparent sm:bg-muted/20 space-y-4">
                                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                                             <div>
                                                 <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Pilih Cabang Toko</label>
@@ -956,7 +955,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                         </div>
                                     </div>
                                     {/* Section 2: Spesifikasi & Identitas */}
-                                    <div className="p-4 rounded-xl border border-border dark:border-input bg-muted/20 space-y-4">
+                                    <div className="p-0 sm:p-4 rounded-none sm:rounded-xl border-0 sm:border border-transparent sm:border-border dark:sm:border-input bg-transparent sm:bg-muted/20 space-y-4">
                                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                                             <div className="sm:col-span-2">
                                                 <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Nama Produk / Jasa</label>
@@ -1037,7 +1036,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                     </div>
 
                                     {/* Section 3: Harga & Finansial */}
-                                    <div className="p-4 rounded-xl border border-border dark:border-input bg-muted/20 space-y-4">
+                                    <div className="p-0 sm:p-4 rounded-none sm:rounded-xl border-0 sm:border border-transparent sm:border-border dark:sm:border-input bg-transparent sm:bg-muted/20 space-y-4">
                                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                                             <div className="lg:col-span-2">
                                                 <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Supplier / Pengirim</label>
