@@ -15,7 +15,10 @@ import {
     Wrench,
     Clock,
     User,
-    Filter
+    Filter,
+    Edit,
+    Trash2,
+    RefreshCw
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -248,6 +251,39 @@ export default function Timeline({ activities }: TimelineProps) {
                     desc: (
                         <span>
                             Klaim servis garansi unit <strong className="text-foreground font-semibold">{vals.stock_name || 'Unit'}</strong> diperbarui ke status <strong className="uppercase font-bold text-indigo-500">{vals.status}</strong> {vals.repair_cost > 0 && `dengan biaya perbaikan ${formatCurrency(vals.repair_cost)}`}.
+                        </span>
+                    )
+                };
+            case 'stock_updated':
+                return {
+                    title: 'Stok Diperbarui',
+                    icon: Edit,
+                    colorClass: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20',
+                    desc: (
+                        <span>
+                            Memperbarui detail unit <strong className="text-foreground font-semibold">{vals.name || log.old_values?.name || 'Unit'}</strong> {vals.serial_number ? `(SN: ${vals.serial_number})` : (log.old_values?.serial_number ? `(SN: ${log.old_values.serial_number})` : '')}.
+                        </span>
+                    )
+                };
+            case 'stock_deleted':
+                return {
+                    title: 'Stok Dihapus',
+                    icon: Trash2,
+                    colorClass: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20',
+                    desc: (
+                        <span>
+                            Menghapus unit <strong className="text-foreground font-semibold">{log.old_values?.name || 'Unit'}</strong> {log.old_values?.serial_number && `(SN: ${log.old_values.serial_number})`}.
+                        </span>
+                    )
+                };
+            case 'stock_restored':
+                return {
+                    title: 'Stok Dikembalikan',
+                    icon: RefreshCw,
+                    colorClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20',
+                    desc: (
+                        <span>
+                            Mengembalikan unit <strong className="text-foreground font-semibold">{vals.name || 'Unit'}</strong> {vals.serial_number && `(SN: ${vals.serial_number})`} dari Tempat Sampah (Trash).
                         </span>
                     )
                 };
