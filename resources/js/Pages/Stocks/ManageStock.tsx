@@ -97,6 +97,8 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
     const [selectedStockDetail, setSelectedStockDetail] = useState<StockItem | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
 
+    const uniqueProductNames = Array.from(new Set(stocks.map(s => s.name).filter(Boolean)));
+
     const filteredStocks = stocks.filter(item => {
         const matchesSearch = 
             item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -659,12 +661,12 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
 
                         </div>
                     ) : (
-                        <div className="rounded-lg border border-border bg-card p-6 shadow-sm text-card-foreground">
+                        <div className="rounded-none sm:rounded-lg border-x-0 sm:border border-y-0 sm:border-y bg-transparent sm:bg-card p-0 sm:p-6 shadow-none sm:shadow-sm text-card-foreground">
                             <h3 className="text-lg font-semibold text-foreground mb-6">Tambah Stok Unit Baru</h3>
                             
                             <form onSubmit={submitSingle} className="space-y-6">
                                 {/* Section 1: Lokasi & Kategori */}
-                                <div className="p-4 rounded-xl border border-border dark:border-input bg-muted/20 space-y-4">
+                                <div className="p-0 sm:p-4 rounded-none sm:rounded-xl border-0 sm:border border-transparent sm:border-border dark:sm:border-input bg-transparent sm:bg-muted/20 space-y-4">
                                     <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">1. Lokasi & Kategori Unit</h4>
                                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                                         <div>
@@ -706,7 +708,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                 </div>
 
                                 {/* Section 2: Spesifikasi & Identitas */}
-                                <div className="p-4 rounded-xl border border-border dark:border-input bg-muted/20 space-y-4">
+                                <div className="p-0 sm:p-4 rounded-none sm:rounded-xl border-0 sm:border border-transparent sm:border-border dark:sm:border-input bg-transparent sm:bg-muted/20 space-y-4">
                                     <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">2. Detail Spesifikasi & Identitas Barang</h4>
                                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                                         <div className="sm:col-span-2">
@@ -714,6 +716,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                             <input
                                                 type="text"
                                                 required
+                                                list="product-names-list"
                                                 value={singleForm.data.name}
                                                 onChange={e => singleForm.setData('name', e.target.value)}
                                                 className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
@@ -749,8 +752,8 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                     <input
                                                         type="text"
                                                         value={singleForm.data.serial_number}
-                                                        onChange={e => singleForm.setData('serial_number', e.target.value)}
-                                                        className={`w-full rounded-xl border px-3.5 py-2 text-sm font-bold dark:bg-background ${singleForm.errors.serial_number ? 'border-rose-400' : 'border-input dark:border-input'}`}
+                                                        onChange={e => singleForm.setData('serial_number', e.target.value.toUpperCase())}
+                                                        className={`w-full rounded-xl border px-3.5 py-2 text-sm font-bold uppercase dark:bg-background ${singleForm.errors.serial_number ? 'border-rose-400' : 'border-input dark:border-input'}`}
                                                         placeholder="Serial Number HP"
                                                     />
                                                     {singleForm.errors.serial_number && <p className="mt-1 text-xs text-rose-500">{singleForm.errors.serial_number}</p>}
@@ -763,6 +766,11 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                             ref={imeiSingleRef}
                                                             value={singleForm.data.imei_1}
                                                             onChange={e => singleForm.setData('imei_1', e.target.value)}
+                                                            onKeyDown={e => {
+                                                                if (e.key === 'Enter') {
+                                                                    e.preventDefault();
+                                                                }
+                                                            }}
                                                             className={`flex-1 rounded-xl border px-3.5 py-2 text-sm font-bold dark:bg-background ${singleForm.errors.imei_1 ? 'border-rose-400' : 'border-input dark:border-input'}`}
                                                             placeholder="Scan atau ketik IMEI"
                                                         />
@@ -799,7 +807,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                 </div>
 
                                 {/* Section 3: Harga & Finansial */}
-                                <div className="p-4 rounded-xl border border-border dark:border-input bg-muted/20 space-y-4">
+                                <div className="p-0 sm:p-4 rounded-none sm:rounded-xl border-0 sm:border border-transparent sm:border-border dark:sm:border-input bg-transparent sm:bg-muted/20 space-y-4">
                                     <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">3. Finansial, Garansi & Distribusi</h4>
                                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
                                         <div className="lg:col-span-2">
@@ -817,6 +825,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                             <input
                                                 type="number"
                                                 required
+                                                inputMode="numeric"
                                                 value={singleForm.data.warranty_duration_days}
                                                 onChange={e => singleForm.setData('warranty_duration_days', parseInt(e.target.value) || 0)}
                                                 className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
@@ -829,6 +838,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                     type="number"
                                                     required
                                                     min={1}
+                                                    inputMode="numeric"
                                                     value={singleForm.data.qty}
                                                     onChange={e => singleForm.setData('qty', parseInt(e.target.value) || 1)}
                                                     className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
@@ -844,6 +854,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                 type="number"
                                                 required
                                                 min={0}
+                                                inputMode="numeric"
                                                 value={singleForm.data.buy_price ?? ''}
                                                 onChange={e => singleForm.setData('buy_price', e.target.value === '' ? '' : parseFloat(e.target.value))}
                                                 placeholder="Masukkan harga beli"
@@ -857,6 +868,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                 type="number"
                                                 required
                                                 min={0}
+                                                inputMode="numeric"
                                                 value={singleForm.data.sell_price ?? ''}
                                                 onChange={e => singleForm.setData('sell_price', e.target.value === '' ? '' : parseFloat(e.target.value))}
                                                 placeholder="Masukkan harga jual"
@@ -869,6 +881,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                             <input
                                                 type="number"
                                                 min={0}
+                                                inputMode="numeric"
                                                 value={singleForm.data.sell_price_reseller ?? ''}
                                                 onChange={e => singleForm.setData('sell_price_reseller', e.target.value === '' ? '' : parseFloat(e.target.value))}
                                                 placeholder="Masukkan harga reseller"
@@ -942,7 +955,6 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                             </div>
                                         </div>
                                     </div>
-
                                     {/* Section 2: Spesifikasi & Identitas */}
                                     <div className="p-4 rounded-xl border border-border dark:border-input bg-muted/20 space-y-4">
                                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -951,6 +963,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                 <input
                                                     type="text"
                                                     required
+                                                    list="product-names-list"
                                                     value={editForm.data.name}
                                                     onChange={e => editForm.setData('name', e.target.value)}
                                                     className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
@@ -986,8 +999,8 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                         <input
                                                             type="text"
                                                             value={editForm.data.serial_number}
-                                                            onChange={e => editForm.setData('serial_number', e.target.value)}
-                                                            className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
+                                                            onChange={e => editForm.setData('serial_number', e.target.value.toUpperCase())}
+                                                            className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold uppercase dark:border-input dark:bg-background"
                                                         />
                                                     </div>
                                                     <div>
@@ -996,6 +1009,11 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                             type="text"
                                                             value={editForm.data.imei_1}
                                                             onChange={e => editForm.setData('imei_1', e.target.value)}
+                                                            onKeyDown={e => {
+                                                                if (e.key === 'Enter') {
+                                                                    e.preventDefault();
+                                                                }
+                                                            }}
                                                             className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
                                                         />
                                                     </div>
@@ -1035,6 +1053,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                 <input
                                                     type="number"
                                                     required
+                                                    inputMode="numeric"
                                                     value={editForm.data.warranty_duration_days}
                                                     onChange={e => editForm.setData('warranty_duration_days', parseInt(e.target.value) || 0)}
                                                     className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
@@ -1047,6 +1066,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                         type="number"
                                                         required
                                                         min={1}
+                                                        inputMode="numeric"
                                                         value={editForm.data.qty}
                                                         onChange={e => editForm.setData('qty', parseInt(e.target.value) || 1)}
                                                         className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
@@ -1074,6 +1094,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                     type="number"
                                                     required
                                                     min={0}
+                                                    inputMode="numeric"
                                                     value={editForm.data.buy_price}
                                                     onChange={e => editForm.setData('buy_price', parseFloat(e.target.value) || 0)}
                                                     className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
@@ -1085,6 +1106,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                     type="number"
                                                     required
                                                     min={0}
+                                                    inputMode="numeric"
                                                     value={editForm.data.sell_price}
                                                     onChange={e => editForm.setData('sell_price', parseFloat(e.target.value) || 0)}
                                                     className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
@@ -1095,6 +1117,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                 <input
                                                     type="number"
                                                     min={0}
+                                                    inputMode="numeric"
                                                     value={editForm.data.sell_price_reseller}
                                                     onChange={e => editForm.setData('sell_price_reseller', e.target.value === '' ? '' : parseFloat(e.target.value))}
                                                     className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
@@ -1116,8 +1139,14 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                         </div>
                     )}
 
+                    <datalist id="product-names-list">
+                        {uniqueProductNames.map(name => (
+                            <option key={name} value={name} />
+                        ))}
+                    </datalist>
                 </div>
             </div>
         </AuthenticatedLayout>
     );
 }
+
