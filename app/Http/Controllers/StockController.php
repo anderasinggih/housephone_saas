@@ -24,12 +24,13 @@ class StockController extends Controller
         $storeId = $user->store_id;
 
         // Superadmin and Viewer can view specific stores, otherwise default to all
-        if ($user->role === 'superadmin' && $request->has('store_id')) {
+        if (($user->role === 'superadmin' || $user->role === 'viewer') && $request->has('store_id')) {
             $storeId = $request->input('store_id');
         }
 
         $stocks = Stock::where('status', 'available')
-            ->when($storeId, fn($q) => $q->where('store_id', $storeId))
+            ->when($user->store_id, fn($q) => $q->where('store_id', $user->store_id))
+            ->when(!$user->store_id && $storeId, fn($q) => $q->where('store_id', $storeId))
             ->with(['brand', 'color', 'memory', 'license'])
             ->get();
 
@@ -72,7 +73,7 @@ class StockController extends Controller
         $user = $request->user();
         $storeId = $user->store_id;
 
-        if ($user->role === 'superadmin' && $request->has('store_id')) {
+        if (($user->role === 'superadmin' || $user->role === 'viewer') && $request->has('store_id')) {
             $storeId = $request->input('store_id');
         }
 
@@ -85,8 +86,8 @@ class StockController extends Controller
             'saleItems.sale.buyer',
             'saleItems.sale.affiliateUser'
         ])
-        ->when($user->role !== 'superadmin', fn($q) => $q->where('store_id', $user->store_id))
-        ->when($user->role === 'superadmin' && $storeId, fn($q) => $q->where('store_id', $storeId))
+        ->when($user->store_id, fn($q) => $q->where('store_id', $user->store_id))
+        ->when(!$user->store_id && $storeId, fn($q) => $q->where('store_id', $storeId))
         ->get();
         
         $stores = Store::all();
