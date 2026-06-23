@@ -1,0 +1,84 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+class Stock extends Model
+{
+    protected $fillable = [
+        'store_id',
+        'category',
+        'type',
+        'name',
+        'brand_id',
+        'color_id',
+        'memory_id',
+        'license_id',
+        'grade',
+        'serial_number',
+        'imei_1',
+        'imei_2',
+        'supplier',
+        'warranty_duration_days',
+        'buy_price',
+        'sell_price',
+        'sell_price_reseller',
+        'qty',
+        'status',
+        'ktp_number',
+        'ktp_name',
+        'ktp_photo_path',
+        'brand_rebate_status'
+    ];
+
+    protected $casts = [
+        'warranty_duration_days' => 'integer',
+        'buy_price' => 'decimal:2',
+        'sell_price' => 'decimal:2',
+        'sell_price_reseller' => 'decimal:2',
+        'qty' => 'integer',
+    ];
+
+    public function store(): BelongsTo
+    {
+        return $this->belongsTo(Store::class);
+    }
+
+    public function brand(): BelongsTo
+    {
+        return $this->belongsTo(DynamicParameterValue::class, 'brand_id');
+    }
+
+    public function color(): BelongsTo
+    {
+        return $this->belongsTo(DynamicParameterValue::class, 'color_id');
+    }
+
+    public function memory(): BelongsTo
+    {
+        return $this->belongsTo(DynamicParameterValue::class, 'memory_id');
+    }
+
+    public function license(): BelongsTo
+    {
+        return $this->belongsTo(DynamicParameterValue::class, 'license_id');
+    }
+
+    public function saleItems(): HasMany
+    {
+        return $this->hasMany(SaleItem::class);
+    }
+
+    public function returns(): HasMany
+    {
+        return $this->hasMany(ReturnLog::class);
+    }
+
+    public function transfers(): HasMany
+    {
+        return $this->hasMany(StockTransfer::class);
+    }
+}

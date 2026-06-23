@@ -1,0 +1,420 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Sale;
+use App\Models\SaleItem;
+use App\Models\SaleExtra;
+use App\Models\Buyer;
+use App\Models\Stock;
+use App\Models\ReturnLog;
+use App\Models\WarrantyRepair;
+use App\Models\Store;
+use App\Models\User;
+use App\Models\ActivityLog;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+
+class SaleController extends Controller
+{
+    public function history(Request $request): Response
+    {
+        $user = $request->user();
+        $storeId = $user->store_id;
+
+        if ($user->role === 'superadmin' && $request->has('store_id')) {
+            $storeId = $request->input('store_id');
+        }
+
+        $sales = Sale::with(['buyer', 'user', 'items.stock.brand', 'extras.extra', 'returns', 'repairs'])
+            ->when($storeId, fn($q) => $q->where('store_id', $storeId))
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        // Get list of affiliate users (employees/users) for checkout dropdown
+        $affiliates = User::where('role', 'karyawan')->get();
+
+        return Inertia::render('Sales/SalesHistory', [
+            'sales' => $sales,
+            'affiliates' => $affiliates,
+            'stores' => Store::all(),
+            'filters' => [
+                'store_id' => $storeId
+            ]
+        ]);
+    }
+
+    public function checkout(Request $request): RedirectResponse
+    {
+        if ($request->has('affiliate_user_id') && $request->input('affiliate_user_id') === '') {
+            $request->merge(['affiliate_user_id' => null]);
+        }
+
+        $request->validate([
+            'buyer_name' => 'required|string',
+            'buyer_phone' => 'required|string',
+            'buyer_address' => 'nullable|string',
+            'payment_method' => 'required|in:cash,online',
+            'payment_detail' => 'nullable|string',
+            'dp_amount' => 'required|numeric|min:0',
+            'status' => 'required|in:booking,completed',
+            'affiliate_user_id' => 'nullable|exists:users,id',
+            'affiliate_fee' => 'nullable|numeric|min:0',
+            'transaction_date' => 'nullable|date',
+            
+            // Items purchased
+            'items' => 'required|array|min:1',
+            'items.*.stock_id' => 'required|exists:stocks,id',
+            'items.*.qty' => 'required|integer|min:1',
+            'items.*.actual_sell_price' => 'required|numeric|min:0',
+            
+            // Trade-in HP from buyer (optional)
+            'trade_in' => 'nullable|array',
+            'trade_in.name' => 'required_with:trade_in|string',
+            'trade_in.brand_id' => 'required_with:trade_in|exists:dynamic_parameter_values,id',
+            'trade_in.color_id' => 'required_with:trade_in|exists:dynamic_parameter_values,id',
+            'trade_in.memory_id' => 'required_with:trade_in|exists:dynamic_parameter_values,id',
+            'trade_in.license_id' => 'required_with:trade_in|exists:dynamic_parameter_values,id',
+            'trade_in.grade' => 'required_with:trade_in|string',
+            'trade_in.serial_number' => 'required_with:trade_in|string|unique:stocks,serial_number',
+            'trade_in.imei_1' => 'required_with:trade_in|string|unique:stocks,imei_1',
+            'trade_in.imei_2' => 'nullable|string|unique:stocks,imei_2',
+            'trade_in.buy_price' => 'required_with:trade_in|numeric|min:0', // nilai taksiran beli toko
+            
+            // Extras/Add-ons (optional)
+            'extras' => 'nullable|array',
+            'extras.*.extra_id' => 'required|exists:stocks,id',
+            'extras.*.charge_to' => 'required|in:buyer,seller,free_promotion',
+            'extras.*.sell_price' => 'required|numeric|min:0',
+            'extras.*.buy_price' => 'required|numeric|min:0',
+        ]);
+
+        $user = $request->user();
+        $storeId = $user->store_id;
+        
+        // Find active shift
+        $activeShift = DB::table('shifts')
+            ->where('user_id', $user->id)
+            ->where('store_id', $storeId)
+            ->where('status', 'open')
+            ->first();
+
+        if (!$activeShift) {
+            return redirect()->back()->withErrors(['error' => 'Anda harus membuka shift kasir terlebih dahulu sebelum bertransaksi.']);
+        }
+
+        DB::transaction(function () use ($request, $user, $storeId, $activeShift) {
+            // Find or create buyer
+            $buyer = Buyer::firstOrCreate(
+                ['phone' => $request->input('buyer_phone')],
+                ['name' => $request->input('buyer_name'), 'address' => $request->input('buyer_address')]
+            );
+
+            // Compute total amount
+            $totalAmount = 0;
+            $itemsData = [];
+
+            foreach ($request->input('items') as $item) {
+                $stock = Stock::findOrFail($item['stock_id']);
+                
+                // Deduct inventory
+                if ($stock->category === 'accessories') {
+                    if ($stock->qty < $item['qty']) {
+                        throw new \Exception("Stok aksesoris '{$stock->name}' tidak mencukupi.");
+                    }
+                    $stock->decrement('qty', $item['qty']);
+                    if ($stock->qty === 0) {
+                        $stock->update(['status' => 'sold']);
+                    }
+                } else {
+                    $stock->update(['status' => 'sold']);
+                }
+
+                $totalAmount += $item['actual_sell_price'] * $item['qty'];
+                $itemsData[] = [
+                    'stock_id' => $stock->id,
+                    'qty' => $item['qty'],
+                    'actual_sell_price' => $item['actual_sell_price'],
+                    'buy_price_snap' => $stock->buy_price,
+                    'is_trade_in_item' => false
+                ];
+            }
+
+            // Handle trade-in if any
+            $tradeInAmount = 0;
+            $tradeInStock = null;
+            if ($request->has('trade_in') && $request->input('trade_in')) {
+                $tradeIn = $request->input('trade_in');
+                $tradeInAmount = $tradeIn['buy_price'];
+
+                // Create new stock unit in inventory as second-hand available stock
+                $tradeInStock = Stock::create([
+                    'store_id' => $storeId,
+                    'category' => 'iphone', // default category, should be adjusted or verified
+                    'type' => 'second',
+                    'name' => $tradeIn['name'],
+                    'brand_id' => $tradeIn['brand_id'],
+                    'color_id' => $tradeIn['color_id'],
+                    'memory_id' => $tradeIn['memory_id'],
+                    'license_id' => $tradeIn['license_id'],
+                    'grade' => $tradeIn['grade'],
+                    'serial_number' => $tradeIn['serial_number'],
+                    'imei_1' => $tradeIn['imei_1'],
+                    'imei_2' => $tradeIn['imei_2'] ?? null,
+                    'supplier' => 'Trade-In Customer: ' . $buyer->name,
+                    'buy_price' => $tradeIn['buy_price'],
+                    'sell_price' => $tradeIn['buy_price'] * 1.15, // default markup recommendation
+                    'qty' => 1,
+                    'status' => 'available',
+                ]);
+            }
+
+            // Handle extras if any
+            $extrasAmount = 0;
+            $extrasData = [];
+            if ($request->has('extras') && $request->input('extras')) {
+                foreach ($request->input('extras') as $extra) {
+                    // If charged to buyer, add to invoice total
+                    if ($extra['charge_to'] === 'buyer') {
+                        $extrasAmount += $extra['sell_price'];
+                    }
+                    $extrasData[] = [
+                        'extra_id' => $extra['extra_id'],
+                        'charge_to' => $extra['charge_to'],
+                        'sell_price' => $extra['sell_price'],
+                        'buy_price' => $extra['buy_price'],
+                    ];
+                }
+            }
+
+            // Net amount to pay: (items + buyer_extras) - trade_in_allowance
+            $finalTotal = $totalAmount + $extrasAmount - $tradeInAmount;
+
+            $sale = new Sale([
+                'invoice_number' => 'INV-' . strtoupper(Str::random(3)) . '-' . date('YmdHis'),
+                'store_id' => $storeId,
+                'user_id' => $user->id,
+                'buyer_id' => $buyer->id,
+                'shift_id' => $activeShift->id,
+                'payment_method' => $request->input('payment_method'),
+                'payment_detail' => $request->input('payment_detail'),
+                'total_amount' => $finalTotal,
+                'dp_amount' => $request->input('dp_amount'),
+                'status' => $request->input('status'),
+                'affiliate_user_id' => $request->input('affiliate_user_id'),
+                'affiliate_fee' => $request->input('affiliate_fee') ?? 0,
+            ]);
+
+            if ($request->filled('transaction_date')) {
+                $sale->created_at = $request->input('transaction_date');
+            }
+
+            $sale->save();
+
+            // Save sale items
+            foreach ($itemsData as $item) {
+                $sale->items()->create($item);
+            }
+
+            // If trade-in item was created, record it as a sold item connection with is_trade_in_item flag
+            if ($tradeInStock) {
+                $sale->items()->create([
+                    'stock_id' => $tradeInStock->id,
+                    'qty' => 1,
+                    'actual_sell_price' => -$tradeInAmount,
+                    'buy_price_snap' => $tradeInAmount,
+                    'is_trade_in_item' => true
+                ]);
+            }
+
+            // Save sale extras
+            foreach ($extrasData as $extra) {
+                $sale->extras()->create($extra);
+            }
+
+            // Log activity
+            $itemsNames = [];
+            foreach ($sale->items as $item) {
+                if (!$item->is_trade_in_item && $item->stock) {
+                    $itemsNames[] = $item->stock->name . ($item->stock->serial_number ? " (" . $item->stock->serial_number . ")" : "");
+                }
+            }
+            ActivityLog::log('sale_checkout', Sale::class, $sale->id, [
+                'invoice_number' => $sale->invoice_number,
+                'total_amount' => $sale->total_amount,
+                'buyer_name' => $buyer->name,
+                'items_detail' => implode(', ', $itemsNames)
+            ]);
+        });
+
+        return redirect()->back()->with('success', 'Transaksi berhasil diselesaikan.');
+    }
+
+    public function void(Request $request, $id): RedirectResponse
+    {
+        $request->validate([
+            'void_reason' => 'required|string|min:5',
+        ]);
+
+        $sale = Sale::findOrFail($id);
+        $sale->update([
+            'void_requested' => true,
+            'void_reason' => $request->input('void_reason'),
+        ]);
+
+        ActivityLog::log('sale_void_requested', Sale::class, $sale->id, [
+            'invoice_number' => $sale->invoice_number,
+            'void_reason' => $sale->void_reason
+        ]);
+
+        return redirect()->back()->with('success', 'Permohonan pembatalan transaksi (void) berhasil dikirim.');
+    }
+
+    public function approveVoid(Request $request, $id): RedirectResponse
+    {
+        $user = $request->user();
+        if ($user->role !== 'superadmin') {
+            abort(403);
+        }
+
+        $sale = Sale::findOrFail($id);
+        if (!$sale->void_requested) {
+            return redirect()->back()->withErrors(['error' => 'Transaksi tidak mengajukan void.']);
+        }
+
+        DB::transaction(function () use ($sale) {
+            $sale->update(['status' => 'cancelled', 'void_requested' => false]);
+
+            // Return items back to stock
+            foreach ($sale->items as $item) {
+                if ($item->is_trade_in_item) {
+                    // Stolen / Trade-in stock item is removed since transaction was cancelled
+                    $item->stock->delete();
+                } else {
+                    if ($item->stock->category === 'accessories') {
+                        $item->stock->increment('qty', $item->qty);
+                        $item->stock->update(['status' => 'available']);
+                    } else {
+                        $item->stock->update(['status' => 'available']);
+                    }
+                }
+            }
+
+            ActivityLog::log('sale_void_approved', Sale::class, $sale->id, [
+                'invoice_number' => $sale->invoice_number
+            ]);
+        });
+
+        return redirect()->back()->with('success', 'Pembatalan transaksi (void) disetujui.');
+    }
+
+    public function returnItem(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'sale_id' => 'required|exists:sales,id',
+            'stock_id' => 'required|exists:stocks,id',
+            'restocking_fee' => 'required|numeric|min:0',
+            'notes' => 'nullable|string',
+        ]);
+
+        $sale = Sale::findOrFail($request->input('sale_id'));
+        $stock = Stock::findOrFail($request->input('stock_id'));
+
+        // Check if item is part of sale
+        $saleItem = SaleItem::where('sale_id', $sale->id)->where('stock_id', $stock->id)->first();
+        if (!$saleItem) {
+            return redirect()->back()->withErrors(['error' => 'Barang tidak cocok dengan transaksi.']);
+        }
+
+        DB::transaction(function () use ($request, $sale, $stock, $saleItem) {
+            $refundAmount = $saleItem->actual_sell_price - $request->input('restocking_fee');
+
+            ReturnLog::create([
+                'sale_id' => $sale->id,
+                'stock_id' => $stock->id,
+                'restocking_fee' => $request->input('restocking_fee'),
+                'refund_amount' => $refundAmount,
+                'notes' => $request->input('notes'),
+            ]);
+
+            // Revert stock
+            if ($stock->category === 'accessories') {
+                $stock->increment('qty', $saleItem->qty);
+                $stock->update(['status' => 'available']);
+            } else {
+                $stock->update(['status' => 'available']);
+            }
+
+            ActivityLog::log('sale_return', Stock::class, $stock->id, [
+                'invoice_number' => $sale->invoice_number,
+                'stock_name' => $stock->name,
+                'refund_amount' => $refundAmount,
+                'restocking_fee' => $request->input('restocking_fee')
+            ]);
+        });
+
+        return redirect()->back()->with('success', 'Retur barang berhasil dicatat.');
+    }
+
+    public function warrantyClaim(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'sale_id' => 'required|exists:sales,id',
+            'stock_id' => 'required|exists:stocks,id',
+            'damage_description' => 'required|string',
+        ]);
+
+        $repair = WarrantyRepair::create([
+            'sale_id' => $request->input('sale_id'),
+            'stock_id' => $request->input('stock_id'),
+            'damage_description' => $request->input('damage_description'),
+            'status' => 'pending',
+        ]);
+
+        $stock = Stock::find($request->input('stock_id'));
+
+        ActivityLog::log('warranty_claim', WarrantyRepair::class, $repair->id, [
+            'stock_name' => $stock ? $stock->name : '',
+            'damage_description' => $repair->damage_description
+        ]);
+
+        return redirect()->back()->with('success', 'Klaim garansi servis berhasil diajukan.');
+    }
+
+    public function updateWarranty(Request $request, $id): RedirectResponse
+    {
+        $repair = WarrantyRepair::findOrFail($id);
+        $user = $request->user();
+
+        $request->validate([
+            'status' => 'required|in:pending,approved,in_repair,repaired,rejected',
+            'repair_cost' => 'nullable|numeric|min:0',
+            'notes' => 'nullable|string',
+        ]);
+
+        if ($user->role !== 'superadmin' && $request->input('status') === 'approved') {
+            abort(403, 'Hanya superadmin yang dapat menyetujui klaim garansi.');
+        }
+
+        $repair->update([
+            'status' => $request->input('status'),
+            'repair_cost' => $request->input('repair_cost') ?? $repair->repair_cost,
+            'notes' => $request->input('notes') ?? $repair->notes,
+            'approved_by' => $user->role === 'superadmin' ? $user->id : $repair->approved_by
+        ]);
+
+        $stock = Stock::find($repair->stock_id);
+
+        ActivityLog::log('warranty_update', WarrantyRepair::class, $repair->id, [
+            'stock_name' => $stock ? $stock->name : '',
+            'status' => $repair->status,
+            'repair_cost' => $repair->repair_cost
+        ]);
+
+        return redirect()->back()->with('success', 'Status klaim garansi servis diperbarui.');
+    }
+}
