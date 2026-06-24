@@ -19,7 +19,7 @@ class TsvDataSeeder extends Seeder
 {
     public function run(): void
     {
-        $filePath = '/Volumes/LVNPC/HOUSEPHONE SAAS/housephone_saas/database/seeders/raw_data.tsv';
+        $filePath = database_path('seeders/raw_data.tsv');
         if (!file_exists($filePath)) {
             $this->command->error("Cleaned TSV file not found at: {$filePath}");
             return;
