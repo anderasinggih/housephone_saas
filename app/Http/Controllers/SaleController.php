@@ -113,7 +113,7 @@ class SaleController extends Controller
             ->where('status', 'open')
             ->first();
 
-        if (!$activeShift) {
+        if (!$activeShift && $user->role !== 'superadmin') {
             return redirect()->back()->withErrors(['error' => 'Anda harus membuka shift kasir terlebih dahulu sebelum bertransaksi.']);
         }
 
@@ -207,7 +207,7 @@ class SaleController extends Controller
                 'store_id' => $storeId,
                 'user_id' => $user->id,
                 'buyer_id' => $buyer->id,
-                'shift_id' => $activeShift->id,
+                'shift_id' => $activeShift?->id ?? null,
                 'payment_method' => $request->input('payment_method'),
                 'payment_detail' => $request->input('payment_detail'),
                 'total_amount' => $finalTotal,
