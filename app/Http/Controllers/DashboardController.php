@@ -169,10 +169,13 @@ class DashboardController extends Controller
             ->when($storeId, fn($q) => $q->where('store_id', $storeId))
             ->whereMonth('created_at', $month)
             ->whereYear('created_at', $year)
-            ->with('items.stock')
+            ->with(['items.stock', 'returns'])
             ->get()
             ->flatMap(function ($sale) {
-                return $sale->items;
+                $returnedStockIds = $sale->returns->pluck('stock_id')->toArray();
+                return $sale->items->filter(function ($item) use ($returnedStockIds) {
+                    return !in_array($item->stock_id, $returnedStockIds) && !$item->is_trade_in_item;
+                });
             })
             ->groupBy(function ($item) {
                 return $item->stock->name ?? 'Unknown';
@@ -256,12 +259,17 @@ class DashboardController extends Controller
         $topProducts = DB::table('sale_items')
             ->join('stocks', 'sale_items.stock_id', '=', 'stocks.id')
             ->join('sales', 'sale_items.sale_id', '=', 'sales.id')
+            ->leftJoin('return_logs', function ($join) {
+                $join->on('sale_items.sale_id', '=', 'return_logs.sale_id')
+                     ->on('sale_items.stock_id', '=', 'return_logs.stock_id');
+            })
+            ->whereNull('return_logs.id')
             ->select('stocks.name', DB::raw('SUM(sale_items.qty) as total_sold'))
             ->where('sales.status', 'completed')
             ->whereMonth('sales.created_at', $month)
             ->whereYear('sales.created_at', $year)
             ->when($storeId, fn($q) => $q->where('stocks.store_id', $storeId))
-            ->groupBy('stocks.name', 'sale_items.stock_id')
+            ->groupBy('stocks.name')
             ->orderBy('total_sold', 'desc')
             ->limit(5)
             ->get();
