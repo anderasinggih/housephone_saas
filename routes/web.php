@@ -48,6 +48,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/sales/return', [SaleController::class, 'returnItem'])->name('sales.return');
     Route::post('/sales/warranty', [SaleController::class, 'warrantyClaim'])->name('sales.warranty');
     Route::post('/sales/warranty/{repair}/update', [SaleController::class, 'updateWarranty'])->name('sales.warranty.update');
+    Route::patch('/sales/{sale}/buyer', [SaleController::class, 'updateBuyer'])->name('sales.update-buyer');
 
     // Customers
     Route::get('/customers', [CustomerController::class, 'index'])->name('customers.index');

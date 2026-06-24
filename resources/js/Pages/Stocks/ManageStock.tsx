@@ -231,7 +231,8 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
         buy_price: '' as string | number,
         sell_price: '' as string | number,
         sell_price_reseller: '' as string | number,
-        qty: 1
+        qty: 1,
+        default_charge_to: 'buyer' as 'buyer' | 'seller' | 'free_promotion'
     });
 
     const editForm = useForm({
@@ -251,7 +252,8 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
         sell_price: '' as string | number,
         sell_price_reseller: '' as string | number,
         qty: 1,
-        status: 'available' as 'available' | 'transit' | 'sold'
+        status: 'available' as 'available' | 'transit' | 'sold',
+        default_charge_to: 'buyer' as 'buyer' | 'seller' | 'free_promotion'
     });
 
     const openEditModal = (stock: StockItem) => {
@@ -272,7 +274,8 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
             sell_price: stock.sell_price ? Math.round(parseFloat(stock.sell_price as any)) : '',
             sell_price_reseller: stock.sell_price_reseller ? Math.round(parseFloat(stock.sell_price_reseller as any)) : '',
             qty: stock.qty || 1,
-            status: stock.status || 'available'
+            status: stock.status || 'available',
+            default_charge_to: (stock as any).default_charge_to || 'buyer'
         });
         setIsEditingStock(true);
     };
@@ -479,7 +482,8 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                     <h3 className="text-lg font-black text-foreground">All Sale Data</h3>
                                 </div>
                                 
-                                <div className="overflow-x-auto">
+                                <div className="overflow-x-auto -webkit-overflow-scrolling-touch">
+                                    <div style={{ minWidth: 'max-content', width: '100%' }}>
                                     <table className="w-full min-w-[1050px] text-left border-collapse">
                                         <thead>
                                             <tr className="border-b border-border dark:border-input text-[11px] font-bold uppercase tracking-wider text-gray-400 select-none">
@@ -566,9 +570,16 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                 return displayItems.map((item, idx) => {
                                                     const prevItem = idx > 0 ? displayItems[idx - 1] : null;
                                                     const isFirstItem = idx === 0;
+                                                    // Show available header: first item AND it's available/transit (not sold, not trash)
                                                     const showAvailableHeader = isFirstItem && !item.deleted_at && item.status !== 'sold';
-                                                    const showSoldDivider = prevItem && (prevItem.status !== 'sold' && !prevItem.deleted_at) && (item.status === 'sold' && !item.deleted_at);
-                                                    const showTrashDivider = prevItem && !prevItem.deleted_at && item.deleted_at;
+                                                    // Show sold divider: when transitioning from non-sold to sold, OR if first item is already sold
+                                                    const showSoldDivider = !item.deleted_at && item.status === 'sold' && (
+                                                        isFirstItem || (prevItem && prevItem.status !== 'sold' && !prevItem.deleted_at)
+                                                    );
+                                                    // Show trash divider: when transitioning from non-trash to trash, OR if first item is trash
+                                                    const showTrashDivider = !!item.deleted_at && (
+                                                        isFirstItem || (prevItem && !prevItem.deleted_at)
+                                                    );
 
                                                     const saleItem = item.sale_items && item.sale_items[0];
                                                     const sale = saleItem?.sale;
@@ -595,40 +606,46 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                     return (
                                                         <Fragment key={item.id}>
                                                             {showAvailableHeader && (
-                                                                <tr className="bg-emerald-500/5 dark:bg-emerald-950/10 select-none">
-                                                                    <td colSpan={isSuperAdmin ? 19 : 15} className="py-2.5 px-3 border-b border-emerald-100 dark:border-emerald-950/40 text-center">
-                                                                        <div className="flex items-center justify-center gap-2">
-                                                                            <div className="h-px bg-emerald-200 dark:bg-emerald-950 flex-1" />
-                                                                            <span className="text-[10px] font-black tracking-wider uppercase text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded border border-emerald-500/20">
-                                                                                ✓ UNIT TERSEDIA (AVAILABLE)
+                                                                <tr className="select-none">
+                                                                    <td colSpan={isSuperAdmin ? 19 : 15} className="py-0">
+                                                                        <div className="flex items-center gap-3 px-3 py-2 bg-emerald-500/10 border-y border-emerald-200 dark:border-emerald-900/50">
+                                                                            <div className="w-1 h-5 rounded-full bg-emerald-500 flex-shrink-0" />
+                                                                            <span className="text-[11px] font-black tracking-wider uppercase text-emerald-700 dark:text-emerald-400">
+                                                                                ✓ Unit Tersedia (Available)
                                                                             </span>
-                                                                            <div className="h-px bg-emerald-200 dark:bg-emerald-950 flex-1" />
+                                                                            <div className="ml-auto text-[10px] font-bold text-emerald-500/60">
+                                                                                {displayItems.filter(i => !i.deleted_at && i.status !== 'sold').length} unit
+                                                                            </div>
                                                                         </div>
                                                                     </td>
                                                                 </tr>
                                                             )}
                                                             {showSoldDivider && (
-                                                                <tr className="bg-rose-500/5 dark:bg-rose-950/10 select-none">
-                                                                    <td colSpan={isSuperAdmin ? 19 : 15} className="py-2.5 px-3 border-y border-rose-100 dark:border-rose-950/40 text-center">
-                                                                        <div className="flex items-center justify-center gap-2">
-                                                                            <div className="h-px bg-rose-200 dark:bg-rose-950 flex-1" />
-                                                                            <span className="text-[10px] font-black tracking-wider uppercase text-rose-600 dark:text-rose-400 bg-rose-500/10 px-2.5 py-0.5 rounded border border-rose-500/20">
-                                                                                UNIT SUDAH TERJUAL (SOLD)
+                                                                <tr className="select-none">
+                                                                    <td colSpan={isSuperAdmin ? 19 : 15} className="py-0">
+                                                                        <div className="flex items-center gap-3 px-3 py-2 bg-rose-500/10 border-y border-rose-200 dark:border-rose-900/50">
+                                                                            <div className="w-1 h-5 rounded-full bg-rose-500 flex-shrink-0" />
+                                                                            <span className="text-[11px] font-black tracking-wider uppercase text-rose-700 dark:text-rose-400">
+                                                                                ✗ Unit Sudah Terjual (Sold)
                                                                             </span>
-                                                                            <div className="h-px bg-rose-200 dark:bg-rose-950 flex-1" />
+                                                                            <div className="ml-auto text-[10px] font-bold text-rose-500/60">
+                                                                                {displayItems.filter(i => !i.deleted_at && i.status === 'sold').length} unit
+                                                                            </div>
                                                                         </div>
                                                                     </td>
                                                                 </tr>
                                                             )}
                                                             {showTrashDivider && (
-                                                                <tr className="bg-gray-500/5 dark:bg-gray-900/10 select-none">
-                                                                    <td colSpan={isSuperAdmin ? 19 : 15} className="py-2.5 px-3 border-y border-gray-200 dark:border-gray-800 text-center">
-                                                                        <div className="flex items-center justify-center gap-2">
-                                                                            <div className="h-px bg-gray-200 dark:bg-gray-800 flex-1" />
-                                                                            <span className="text-[10px] font-black tracking-wider uppercase text-gray-500 dark:text-gray-400 bg-gray-500/10 px-2.5 py-0.5 rounded border border-gray-500/20">
-                                                                                UNIT DI TEMPAT SAMPAH (TRASH)
+                                                                <tr className="select-none">
+                                                                    <td colSpan={isSuperAdmin ? 19 : 15} className="py-0">
+                                                                        <div className="flex items-center gap-3 px-3 py-2 bg-gray-500/10 border-y border-gray-200 dark:border-gray-800">
+                                                                            <div className="w-1 h-5 rounded-full bg-gray-400 flex-shrink-0" />
+                                                                            <span className="text-[11px] font-black tracking-wider uppercase text-gray-600 dark:text-gray-400">
+                                                                                ⊘ Unit di Tempat Sampah (Trash)
                                                                             </span>
-                                                                            <div className="h-px bg-gray-200 dark:bg-gray-800 flex-1" />
+                                                                            <div className="ml-auto text-[10px] font-bold text-gray-400/60">
+                                                                                {displayItems.filter(i => !!i.deleted_at).length} unit
+                                                                            </div>
                                                                         </div>
                                                                     </td>
                                                                 </tr>
@@ -699,6 +716,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                             })()}
                                         </tbody>
                                     </table>
+                                    </div>
                                 </div>
                                 </div>
                             </div>
@@ -1140,6 +1158,24 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                     onChange={e => singleForm.setData('qty', parseInt(e.target.value) || 1)}
                                                     className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
                                                 />
+                                            </div>
+                                        )}
+                                        {singleForm.data.category === 'extra' && (
+                                            <div className="sm:col-span-2 lg:col-span-2">
+                                                <label className="block text-xs font-bold uppercase text-gray-400 mb-1">
+                                                    Tanggung Biaya Default
+                                                    <span className="ml-1 normal-case font-normal text-gray-400">(otomatis dipilih saat checkout)</span>
+                                                </label>
+                                                <select
+                                                    value={singleForm.data.default_charge_to}
+                                                    onChange={e => singleForm.setData('default_charge_to', e.target.value as any)}
+                                                    className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
+                                                >
+                                                    <option value="buyer">Buyer (Pembeli Bayar)</option>
+                                                    <option value="seller">Toko Tanggung (HPP)</option>
+                                                    <option value="free_promotion">Promosi Free (Gratis)</option>
+                                                </select>
+                                                <p className="text-[10px] text-gray-400 mt-1">Pilihan ini akan muncul otomatis terisi saat add-on ini dipilih di form checkout — tidak perlu pilih ulang.</p>
                                             </div>
                                         )}
                                     </div>

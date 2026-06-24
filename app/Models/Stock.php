@@ -33,7 +33,8 @@ class Stock extends Model
         'ktp_number',
         'ktp_name',
         'ktp_photo_path',
-        'brand_rebate_status'
+        'brand_rebate_status',
+        'default_charge_to'
     ];
 
     protected $casts = [

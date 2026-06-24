@@ -106,16 +106,12 @@ class SaleController extends Controller
             $storeId = $request->input('store_id');
         }
         
-        // Find active shift
+        // Find active shift (optional — not required for checkout)
         $activeShift = DB::table('shifts')
             ->where('user_id', $user->id)
             ->where('store_id', $storeId)
             ->where('status', 'open')
             ->first();
-
-        if (!$activeShift && $user->role !== 'superadmin') {
-            return redirect()->back()->withErrors(['error' => 'Anda harus membuka shift kasir terlebih dahulu sebelum bertransaksi.']);
-        }
 
         $sale = DB::transaction(function () use ($request, $user, $storeId, $activeShift) {
             // Find or create buyer
@@ -273,39 +269,24 @@ class SaleController extends Controller
             'void_reason' => 'required|string|min:5',
         ]);
 
-        $sale = Sale::findOrFail($id);
-        $sale->update([
-            'void_requested' => true,
-            'void_reason' => $request->input('void_reason'),
-        ]);
-
-        ActivityLog::log('sale_void_requested', Sale::class, $sale->id, [
-            'invoice_number' => $sale->invoice_number,
-            'void_reason' => $sale->void_reason
-        ]);
-
-        return redirect()->back()->with('success', 'Permohonan pembatalan transaksi (void) berhasil dikirim.');
-    }
-
-    public function approveVoid(Request $request, $id): RedirectResponse
-    {
         $user = $request->user();
-        if ($user->role !== 'superadmin') {
-            abort(403);
+        $sale = Sale::with(['items.stock'])->findOrFail($id);
+
+        if ($sale->status === 'cancelled') {
+            return redirect()->back()->withErrors(['error' => 'Transaksi sudah dibatalkan.']);
         }
 
-        $sale = Sale::findOrFail($id);
-        if (!$sale->void_requested) {
-            return redirect()->back()->withErrors(['error' => 'Transaksi tidak mengajukan void.']);
-        }
-
-        DB::transaction(function () use ($sale) {
-            $sale->update(['status' => 'cancelled', 'void_requested' => false]);
+        DB::transaction(function () use ($sale, $request, $user) {
+            $sale->update([
+                'status' => 'cancelled',
+                'void_requested' => false,
+                'void_reason' => $request->input('void_reason'),
+            ]);
 
             // Return items back to stock
             foreach ($sale->items as $item) {
+                if (!$item->stock) continue;
                 if ($item->is_trade_in_item) {
-                    // Stolen / Trade-in stock item is removed since transaction was cancelled
                     $item->stock->delete();
                 } else {
                     if ($item->stock->category === 'accessories') {
@@ -317,12 +298,20 @@ class SaleController extends Controller
                 }
             }
 
-            ActivityLog::log('sale_void_approved', Sale::class, $sale->id, [
-                'invoice_number' => $sale->invoice_number
+            ActivityLog::log('sale_void', Sale::class, $sale->id, [
+                'invoice_number' => $sale->invoice_number,
+                'void_reason' => $request->input('void_reason'),
+                'voided_by' => $user->name,
             ]);
         });
 
-        return redirect()->back()->with('success', 'Pembatalan transaksi (void) disetujui.');
+        return redirect()->back()->with('success', 'Transaksi berhasil dibatalkan (void).');
+    }
+
+    // approveVoid kept for backward compatibility but redirects to void
+    public function approveVoid(Request $request, $id): RedirectResponse
+    {
+        return redirect()->back()->with('info', 'Void langsung diproses tanpa persetujuan.');
     }
 
     public function returnItem(Request $request): RedirectResponse
@@ -429,6 +418,33 @@ class SaleController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Status klaim garansi servis diperbarui.');
+    }
+
+    public function updateBuyer(Request $request, Sale $sale): RedirectResponse
+    {
+        $request->validate([
+            'buyer_name' => 'required|string|max:255',
+            'buyer_phone' => 'required|string|max:50',
+            'buyer_address' => 'nullable|string|max:500',
+        ]);
+
+        $buyer = Buyer::find($sale->buyer_id);
+        if (!$buyer) {
+            return redirect()->back()->withErrors(['error' => 'Data pembeli tidak ditemukan.']);
+        }
+
+        $buyer->update([
+            'name' => $request->input('buyer_name'),
+            'phone' => $request->input('buyer_phone'),
+            'address' => $request->input('buyer_address'),
+        ]);
+
+        ActivityLog::log('buyer_updated', Sale::class, $sale->id, [
+            'invoice_number' => $sale->invoice_number,
+            'buyer_name' => $buyer->name,
+        ]);
+
+        return redirect()->back()->with('success', 'Data pembeli berhasil diperbarui.');
     }
 
     public function publicInvoice($invoiceNumber)

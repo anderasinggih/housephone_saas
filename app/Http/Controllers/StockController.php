@@ -130,6 +130,7 @@ class StockController extends Controller
             'sell_price' => 'required|numeric|min:0',
             'sell_price_reseller' => 'nullable|numeric|min:0',
             'qty' => 'required|integer|min:1',
+            'default_charge_to' => 'nullable|in:buyer,seller,free_promotion',
         ]);
         
         // Remove grade/imei_2 if passed from old form
@@ -351,6 +352,7 @@ class StockController extends Controller
             'sell_price_reseller' => 'nullable|numeric|min:0',
             'qty' => 'required|integer|min:1',
             'status' => 'required|in:available,transit,sold',
+            'default_charge_to' => 'nullable|in:buyer,seller,free_promotion',
         ]);
 
         $wasSold = $stock->status === 'sold';

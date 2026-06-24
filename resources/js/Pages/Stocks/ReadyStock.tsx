@@ -55,6 +55,7 @@ interface StockItem {
     sell_price_reseller: number | null;
     qty: number;
     status: 'available' | 'transit' | 'sold';
+    default_charge_to?: 'buyer' | 'seller' | 'free_promotion';
     brand?: { value: string };
     color?: { value: string };
     memory?: { value: string };
@@ -293,9 +294,11 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
         if (exists) {
             checkoutForm.setData('extras', checkoutForm.data.extras.filter(e => e.extra_id !== addon.id));
         } else {
+            // Use the addon's default_charge_to if set, otherwise default to 'buyer'
+            const defaultCharge = addon.default_charge_to || 'buyer';
             checkoutForm.setData('extras', [
                 ...checkoutForm.data.extras,
-                { extra_id: addon.id, charge_to: 'buyer', sell_price: addon.sell_price, buy_price: addon.buy_price }
+                { extra_id: addon.id, charge_to: defaultCharge, sell_price: addon.sell_price, buy_price: addon.buy_price }
             ]);
         }
     };
