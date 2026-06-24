@@ -17,7 +17,8 @@ import {
     QrCode,
     MessageCircle,
     Send,
-    ExternalLink
+    ExternalLink,
+    RotateCcw
 } from 'lucide-react';
 
 interface ParameterValue {
@@ -297,6 +298,35 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                 onSuccess: () => {
                     setSelectedStockDetail(null);
                     alert('Stok unit berhasil dipulihkan!');
+                }
+            });
+        }
+    };
+
+    const handleQuickRestoreToAvailable = (stock: StockItem) => {
+        if (confirm('Apakah Anda yakin ingin membatalkan status TERJUAL unit ini? Unit akan kembali TERSEDIA (available) dan transaksi penjualan unit ini akan DIHAPUS.')) {
+            router.put(route('stocks.update', stock.id), {
+                store_id: stock.store_id || '',
+                category: stock.category || 'iphone',
+                type: stock.type || 'new',
+                name: stock.name || '',
+                brand_id: stock.brand_id || '',
+                color_id: stock.color_id || '',
+                memory_id: stock.memory_id || '',
+                license_id: stock.license_id || '',
+                serial_number: stock.serial_number || '',
+                imei_1: stock.imei_1 || '',
+                supplier: stock.supplier || '',
+                warranty_duration_days: stock.warranty_duration_days || 0,
+                buy_price: stock.buy_price ? Math.round(parseFloat(stock.buy_price as any)) : 0,
+                sell_price: stock.sell_price ? Math.round(parseFloat(stock.sell_price as any)) : 0,
+                sell_price_reseller: stock.sell_price_reseller ? Math.round(parseFloat(stock.sell_price_reseller as any)) : 0,
+                qty: stock.qty || 1,
+                status: 'available'
+            }, {
+                onSuccess: () => {
+                    setSelectedStockDetail(null);
+                    alert('Status unit berhasil dikembalikan ke Tersedia (Available) & data penjualan telah dihapus.');
                 }
             });
         }
@@ -809,33 +839,44 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                         </div>
                                     )}
                                     {isSuperAdmin && (
-                                        <div className="flex gap-3 pt-4 border-t border-border dark:border-input">
-                                            {selectedStockDetail.deleted_at ? (
+                                        <div className="space-y-2 pt-4 border-t border-border dark:border-input">
+                                            {selectedStockDetail.status === 'sold' && !selectedStockDetail.deleted_at && (
                                                 <button
                                                     type="button"
-                                                    onClick={() => handleRestoreStock(selectedStockDetail.id)}
-                                                    className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-xs font-semibold text-white hover:bg-emerald-700 transition"
+                                                    onClick={() => handleQuickRestoreToAvailable(selectedStockDetail)}
+                                                    className="w-full rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 transition flex items-center justify-center gap-1.5"
                                                 >
-                                                    Restore Unit
+                                                    <RotateCcw className="h-4 w-4" /> Kembalikan ke Ready Stock
                                                 </button>
-                                            ) : (
-                                                <>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => openEditModal(selectedStockDetail)}
-                                                        className="flex-1 rounded-xl bg-indigo-600 py-2.5 text-xs font-semibold text-white hover:bg-indigo-700 transition"
-                                                    >
-                                                        Edit Unit
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleDeleteStock(selectedStockDetail.id)}
-                                                        className="flex-1 rounded-xl bg-rose-600 py-2.5 text-xs font-semibold text-white hover:bg-rose-700 transition"
-                                                    >
-                                                        Hapus Unit
-                                                    </button>
-                                                </>
                                             )}
+                                            <div className="flex gap-3">
+                                                {selectedStockDetail.deleted_at ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRestoreStock(selectedStockDetail.id)}
+                                                        className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-xs font-semibold text-white hover:bg-emerald-700 transition"
+                                                    >
+                                                        Restore Unit
+                                                    </button>
+                                                ) : (
+                                                    <>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => openEditModal(selectedStockDetail)}
+                                                            className="flex-1 rounded-xl bg-indigo-600 py-2.5 text-xs font-semibold text-white hover:bg-indigo-700 transition"
+                                                        >
+                                                            Edit Unit
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleDeleteStock(selectedStockDetail.id)}
+                                                            className="flex-1 rounded-xl bg-rose-600 py-2.5 text-xs font-semibold text-white hover:bg-rose-700 transition"
+                                                        >
+                                                            Hapus Unit
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
                                         </div>
                                     )}
                                 </div>
