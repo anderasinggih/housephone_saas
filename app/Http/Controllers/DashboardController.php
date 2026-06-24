@@ -25,8 +25,12 @@ class DashboardController extends Controller
         }
 
         // Custom time period (month & year)
-        $month = (int)$request->input('month', now()->month);
-        $year = (int)$request->input('year', now()->year);
+        $latestSale = Sale::where('status', 'completed')->latest('created_at')->first();
+        $defaultMonth = $latestSale ? $latestSale->created_at->month : now()->month;
+        $defaultYear = $latestSale ? $latestSale->created_at->year : now()->year;
+
+        $month = (int)$request->input('month', $defaultMonth);
+        $year = (int)$request->input('year', $defaultYear);
 
         // Get periodic statistics (filtered by month, year, and store)
         $salesQuery = Sale::where('status', 'completed')
@@ -72,7 +76,8 @@ class DashboardController extends Controller
 
         $totalRepairs = $repairs->sum('repair_cost');
         $totalReturnPenalty = $returns->sum('restocking_fee');
-        $netProfit = $totalRevenue - $totalHpp - $totalRepairs + $totalReturnPenalty;
+        $totalAffiliatorFee = $sales->sum('affiliate_fee');
+        $netProfit = $totalRevenue - $totalHpp - $totalRepairs + $totalReturnPenalty - $totalAffiliatorFee;
 
         // Calculate Pending Profits (from booking sales) for current period
         $bookingSales = Sale::where('status', 'booking')
@@ -120,9 +125,9 @@ class DashboardController extends Controller
 
         $allTimeRepairs = $allTimeRepairsQuery->sum('repair_cost');
         $allTimeReturnPenalty = $allTimeReturnsQuery->sum('restocking_fee');
-        $allTimeNetProfit = $allTimeRevenue - $allTimeHpp - $allTimeRepairs + $allTimeReturnPenalty;
-        $allTimeSoldItems = $allTimeSales->flatMap(fn($s) => $s->items)->sum('qty');
         $allTimeAffiliatorFee = $allTimeSales->sum('affiliate_fee');
+        $allTimeNetProfit = $allTimeRevenue - $allTimeHpp - $allTimeRepairs + $allTimeReturnPenalty - $allTimeAffiliatorFee;
+        $allTimeSoldItems = $allTimeSales->flatMap(fn($s) => $s->items)->sum('qty');
 
         // --- Type / Phone model distribution (filtered by active period) ---
         $typeData = Sale::where('status', 'completed')
@@ -231,6 +236,8 @@ class DashboardController extends Controller
             $activeStoreName = $activeStore ? $activeStore->name : 'Cabang';
         }
 
+        $activeAffiliatorsCount = $sales->whereNotNull('affiliate_user_id')->pluck('affiliate_user_id')->unique()->count();
+
         return Inertia::render('Dashboard', [
             'stats' => [
                 'totalRevenue' => (float)$totalRevenue,
@@ -241,6 +248,7 @@ class DashboardController extends Controller
                 'totalAffiliatorFee' => $user->role === 'karyawan' ? 0 : (float)$sales->sum('affiliate_fee'),
                 'soldItemsCount' => (int)$sales->flatMap(fn($s) => $s->items)->sum('qty'),
                 'pendingProfit' => $user->role === 'karyawan' ? 0 : (float)$pendingProfit,
+                'activeAffiliatorsCount' => $user->role === 'karyawan' ? 0 : (int)$activeAffiliatorsCount,
             ],
             'allTimeStats' => [
                 'revenue' => (float)$allTimeRevenue,

@@ -83,5 +83,6 @@ class DatabaseSeeder extends Seeder
             $licIds[$lic] = $val->id;
         }
 
+        $this->call(TsvDataSeeder::class);
     }
 }

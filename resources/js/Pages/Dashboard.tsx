@@ -26,6 +26,7 @@ interface DashboardProps {
         totalAffiliatorFee: number;
         soldItemsCount: number;
         pendingProfit: number;
+        activeAffiliatorsCount: number;
     };
     allTimeStats: {
         revenue: number;
@@ -89,8 +90,8 @@ function DonutChart({ data, title, isCurrency = false }: { data: Array<{ label: 
             {total === 0 ? (
                 <div className="flex-1 flex items-center justify-center text-xs font-semibold text-muted-foreground">Tidak ada data</div>
             ) : (
-                <div className="flex flex-1 items-center gap-4 justify-center min-h-0">
-                    <div className="relative w-28 h-28 flex items-center justify-center shrink-0">
+                <div className="flex flex-1 items-center gap-6 justify-center min-h-0">
+                    <div className="relative w-32 h-32 sm:w-36 sm:h-36 md:w-44 md:h-44 flex items-center justify-center shrink-0">
                         <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
                             {data.map((item, idx) => {
                                 const percentage = (item.value / total) * 100;
@@ -115,22 +116,22 @@ function DonutChart({ data, title, isCurrency = false }: { data: Array<{ label: 
                             })}
                         </svg>
                         <div className="absolute inset-0 flex flex-col items-center justify-center">
-                            <span className="text-xl font-bold text-foreground">
+                            <span className="text-lg sm:text-2xl font-black tracking-tight text-foreground">
                                 {isCurrency ? 'Total' : total}
                             </span>
-                            <span className="text-[7px] uppercase tracking-wider text-muted-foreground font-bold">
+                            <span className="text-[8px] sm:text-[9px] uppercase tracking-wider text-muted-foreground font-extrabold mt-0.5">
                                 {isCurrency ? 'Proporsi' : 'Total Unit'}
                             </span>
                         </div>
                     </div>
 
-                    <div className="flex-1 flex flex-col gap-1.5 overflow-y-auto max-h-[220px] pr-1">
+                    <div className="flex-1 flex flex-col gap-2 overflow-y-auto max-h-[220px] pr-1">
                         {data.map((item, idx) => (
-                            <div key={idx} className="flex items-start gap-1 text-left">
-                                <div className="h-2 w-2 rounded-full shrink-0 mt-1" style={{ backgroundColor: item.color }} />
+                            <div key={idx} className="flex items-start gap-1.5 text-left">
+                                <div className="h-2.5 w-2.5 rounded-full shrink-0 mt-0.5" style={{ backgroundColor: item.color }} />
                                 <div className="min-w-0 flex-1">
-                                    <p className="text-[9px] font-bold text-foreground truncate">{item.label}</p>
-                                    <p className="text-[8px] text-muted-foreground font-bold leading-none mt-0.5">
+                                    <p className="text-[10px] font-extrabold text-foreground truncate leading-tight">{item.label}</p>
+                                    <p className="text-[9px] text-muted-foreground font-bold leading-none mt-0.5">
                                         {formatVal(item.value)} • {((item.value / total) * 100).toFixed(0)}%
                                     </p>
                                 </div>
@@ -143,15 +144,9 @@ function DonutChart({ data, title, isCurrency = false }: { data: Array<{ label: 
     );
 }
 
-// Custom Premium Bar Chart Component (Vercel/SaaS style vertical bars)
-function BarChart({ data }: { data: Array<{ month: string; revenue: number }> }) {
-    if (data.length === 0) {
-        return (
-            <div className="rounded-lg border border-border bg-card p-4 shadow-sm flex flex-col justify-center h-[300px] text-center text-muted-foreground">
-                Tidak ada data tren bulanan
-            </div>
-        );
-    }
+// Custom Premium Line Chart Component (Stockbit style area line chart that fits wall-to-wall without distortion)
+function LineChart({ data }: { data: Array<{ month: string; revenue: number }> }) {
+    const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
     const formatIDR = (val: number) => {
         return new Intl.NumberFormat('id-ID', {
@@ -163,56 +158,178 @@ function BarChart({ data }: { data: Array<{ month: string; revenue: number }> })
     };
 
     const maxVal = Math.max(...data.map(d => d.revenue), 1);
+    
+    // Coordinates inside a normalized 500x150 grid
+    const points = data.map((d, i) => {
+        const x = (i / (data.length - 1)) * 500;
+        const y = 150 - (d.revenue / maxVal) * 135 - 5; // 5px padding top/bottom
+        return { x, y, month: d.month, revenue: d.revenue };
+    });
+
+    // Construct smooth bezier curves
+    const getBezierPath = (pts: typeof points) => {
+        if (pts.length === 0) return "";
+        if (pts.length === 1) return `M ${pts[0].x} ${pts[0].y}`;
+        let path = `M ${pts[0].x} ${pts[0].y}`;
+        for (let i = 0; i < pts.length - 1; i++) {
+            const p0 = pts[i];
+            const p1 = pts[i + 1];
+            const cpX1 = p0.x + (p1.x - p0.x) / 3;
+            const cpY1 = p0.y;
+            const cpX2 = p0.x + 2 * (p1.x - p0.x) / 3;
+            const cpY2 = p1.y;
+            path += ` C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${p1.x} ${p1.y}`;
+        }
+        return path;
+    };
+
+    const getBezierAreaPath = (pts: typeof points) => {
+        if (pts.length === 0) return "";
+        if (pts.length === 1) return `M ${pts[0].x} 150 L ${pts[0].x} ${pts[0].y} L ${pts[0].x} 150 Z`;
+        let path = `M ${pts[0].x} 150 L ${pts[0].x} ${pts[0].y}`;
+        for (let i = 0; i < pts.length - 1; i++) {
+            const p0 = pts[i];
+            const p1 = pts[i + 1];
+            const cpX1 = p0.x + (p1.x - p0.x) / 3;
+            const cpY1 = p0.y;
+            const cpX2 = p0.x + 2 * (p1.x - p0.x) / 3;
+            const cpY2 = p1.y;
+            path += ` C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${p1.x} ${p1.y}`;
+        }
+        path += ` L ${pts[pts.length - 1].x} 150 Z`;
+        return path;
+    };
+
+    const linePath = getBezierPath(points);
+    const areaPath = getBezierAreaPath(points);
+
+    // Active displayed info (defaults to latest month when not hovered)
+    const activeIndex = hoveredIdx !== null ? hoveredIdx : data.length - 1;
+    const activeItem = data[activeIndex];
+
+    // Mouse handler to calculate nearest index
+    const handleMouseMove = (e: React.MouseEvent<SVGSVGElement, MouseEvent>) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const width = rect.width;
+        const index = Math.round((x / width) * (data.length - 1));
+        if (index >= 0 && index < data.length) {
+            setHoveredIdx(index);
+        }
+    };
 
     return (
-        <div className="rounded-lg border border-border bg-card p-4 shadow-sm flex flex-col justify-between h-[300px] text-card-foreground">
-            <div className="flex items-center justify-between mb-2 border-b border-border/40 pb-2">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Tren Omset Bulanan</h4>
-                <div className="flex items-center gap-1.5">
-                    <div className="h-2 w-2 rounded-full bg-primary" />
-                    <span className="text-[8px] font-bold text-muted-foreground uppercase">Penjualan Selesai</span>
+        <div className="rounded-lg border border-border bg-card p-4 shadow-sm flex flex-col justify-between h-[380px] md:h-[450px] text-card-foreground">
+            {/* Header info (Stockbit style: updates on hover) */}
+            <div className="flex items-center justify-between mb-4 border-b border-border/40 pb-2">
+                <div className="flex flex-col">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Tren Omset Bulanan</span>
+                    <span className="text-lg sm:text-xl font-black text-emerald-500 tracking-tight mt-0.5">
+                        {formatIDR(activeItem.revenue)}
+                    </span>
+                </div>
+                <div className="flex flex-col items-end">
+                    <span className="text-[9px] font-bold text-muted-foreground uppercase">Periode Aktif</span>
+                    <span className="text-xs font-extrabold text-foreground mt-0.5">
+                        {activeItem.month}
+                    </span>
                 </div>
             </div>
 
-            <div className="h-52 w-full flex items-end gap-3 px-2 pt-6 pb-2">
-                {data.map((d, i) => {
-                    const percent = Math.min((d.revenue / maxVal) * 100, 100);
-                    return (
-                        <div key={i} className="flex-1 flex flex-col items-center justify-end h-full group relative">
-                            {/* Hover Tooltip */}
-                            <div className="absolute bottom-full mb-2 hidden group-hover:flex flex-col items-center z-10 animate-in fade-in duration-200">
-                                <span className="bg-popover text-popover-foreground text-[9px] font-bold px-2 py-1 rounded shadow-md border border-border whitespace-nowrap">
-                                    {formatIDR(d.revenue)}
-                                </span>
-                                <div className="w-1.5 h-1.5 bg-popover border-r border-b border-border rotate-45 -mt-1" />
-                            </div>
+            {/* Main Area layout: chart + grid */}
+            <div className="flex-1 flex gap-4 min-h-0 relative">
+                {/* Chart body */}
+                <div className="flex-1 h-full relative group">
+                    {/* SVG Canvas for grid lines, path line, area fill */}
+                    <svg 
+                        className="w-full h-full cursor-crosshair overflow-visible"
+                        viewBox="0 0 500 150"
+                        preserveAspectRatio="none"
+                        onMouseMove={handleMouseMove}
+                        onMouseLeave={() => setHoveredIdx(null)}
+                    >
+                        <defs>
+                            {/* Area Gradient */}
+                            <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#10b981" stopOpacity="0.15" />
+                                <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+                            </linearGradient>
+                        </defs>
 
-                            {/* Bar */}
-                            <div 
-                                style={{ height: `${percent || 4}%` }} 
-                                className="w-full rounded-t-md bg-gradient-to-t from-primary/80 to-primary transition-all duration-300 group-hover:from-primary group-hover:to-primary/95 shadow-[0_0_12px_rgba(var(--primary),0.1)] group-hover:shadow-[0_0_16px_rgba(var(--primary),0.25)]"
+                        {/* Area */}
+                        {areaPath && (
+                            <path d={areaPath} fill="url(#areaGrad)" />
+                        )}
+
+                        {/* Line */}
+                        {linePath && (
+                            <path 
+                                d={linePath} 
+                                fill="none" 
+                                stroke="#10b981" 
+                                strokeWidth="2" 
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
                             />
-                            
-                            {/* Label */}
-                            <span className="text-[8px] font-bold text-muted-foreground uppercase mt-2 whitespace-nowrap truncate max-w-full">
-                                {d.month}
-                            </span>
+                        )}
+
+                        {/* Interactive vertical hover cursor line & active point */}
+                        {hoveredIdx !== null && (
+                            <>
+                                <line 
+                                    x1={points[hoveredIdx].x}
+                                    y1="0"
+                                    x2={points[hoveredIdx].x}
+                                    y2="150"
+                                    stroke="currentColor"
+                                    className="text-muted-foreground/30"
+                                    strokeWidth="0.8"
+                                    strokeDasharray="3 3"
+                                />
+                                <circle 
+                                    cx={points[hoveredIdx].x}
+                                    cy={points[hoveredIdx].y}
+                                    r="2"
+                                    fill="#10b981"
+                                    stroke="none"
+                                />
+                            </>
+                        )}
+                    </svg>
+                </div>
+
+                {/* Y-Axis Labels on the Right (Stockbit style, no border-l) */}
+                <div className="w-12 h-full flex flex-col justify-between text-right text-[8px] font-bold text-muted-foreground/80 select-none pb-2 pt-1 pl-2">
+                    {[maxVal, maxVal * 0.75, maxVal * 0.5, maxVal * 0.25, 0].map((val, idx) => (
+                        <div key={idx}>
+                            {val >= 1000000 ? `${(val / 1000000).toFixed(0)}JT` : formatIDR(val)}
                         </div>
-                    );
-                })}
+                    ))}
+                </div>
+            </div>
+
+            {/* X-Axis labels at the bottom (HTML to prevent stretching, no border-t) */}
+            <div className="flex justify-between w-full pr-16 pl-1 pt-2 mt-1">
+                {data.map((d, idx) => (
+                    <span key={idx} className="text-[8px] font-bold text-muted-foreground/80 uppercase select-none">
+                        {d.month.split(" ")[0]}
+                    </span>
+                ))}
             </div>
         </div>
     );
 }
 
 // StatCard Component for financial KPIs (more compact spacing)
-function StatCard({ title, value, description, icon }: { title: string; value: number; description: string; icon: React.ReactNode }) {
-    const formatted = new Intl.NumberFormat('id-ID', {
-        style: 'currency',
-        currency: 'IDR',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0
-    }).format(value);
+function StatCard({ title, value, description, icon, isCurrency = true, suffix = 'Unit' }: { title: string; value: number; description: string; icon: React.ReactNode; isCurrency?: boolean; suffix?: string }) {
+    const formatted = isCurrency 
+        ? new Intl.NumberFormat('id-ID', {
+            style: 'currency',
+            currency: 'IDR',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        }).format(value)
+        : `${value} ${suffix}`;
 
     return (
         <div className="relative overflow-hidden rounded-lg border border-border bg-card p-4 text-card-foreground shadow-sm">
@@ -433,7 +550,7 @@ export default function Dashboard({
                     </div>
 
                     {/* Stat Grid for the Selected Period */}
-                    <div className={`grid grid-cols-1 gap-3 ${isKaryawan ? 'sm:grid-cols-2 max-w-2xl' : 'sm:grid-cols-2 lg:grid-cols-5'}`}>
+                    <div className={`grid grid-cols-2 gap-3 ${isKaryawan ? 'max-w-2xl' : 'md:grid-cols-4'}`}>
                         <StatCard 
                             title={`Omset (${getMonthName(filters.month)} ${filters.year})`} 
                             value={stats.totalRevenue} 
@@ -441,16 +558,13 @@ export default function Dashboard({
                             icon={<Coins className="h-5 w-5" />}
                         />
                         {isKaryawan ? (
-                            <div className="rounded-lg border border-border bg-card p-4 text-card-foreground shadow-sm flex items-center justify-between">
-                                <div>
-                                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground font-bold">Item Terjual ({getMonthName(filters.month)})</p>
-                                    <h3 className="text-xl font-extrabold tracking-tight text-foreground mt-1">{stats.soldItemsCount} Unit</h3>
-                                    <p className="mt-2 text-[10px] text-muted-foreground leading-normal">Total unit terinput pada periode ini</p>
-                                </div>
-                                <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-500">
-                                    <Smartphone className="h-5 w-5" />
-                                </div>
-                            </div>
+                            <StatCard 
+                                title={`Item Terjual (${getMonthName(filters.month)})`} 
+                                value={stats.soldItemsCount} 
+                                description="Total unit terinput pada periode ini"
+                                icon={<Smartphone className="h-5 w-5" />}
+                                isCurrency={false}
+                            />
                         ) : (
                             <>
                                 <StatCard 
@@ -472,10 +586,32 @@ export default function Dashboard({
                                     icon={<RotateCcw className="h-5 w-5" />}
                                 />
                                 <StatCard 
+                                    title="Komisi Afiliasi" 
+                                    value={stats.totalAffiliatorFee} 
+                                    description="Total komisi afiliasi terbayar pada periode ini"
+                                    icon={<Users className="h-5 w-5" />}
+                                />
+                                 <StatCard 
+                                     title="Jumlah Afiliator" 
+                                     value={stats.activeAffiliatorsCount} 
+                                     description="Total orang/mitra yang melakukan afiliasi bulan ini"
+                                     icon={<Users className="h-5 w-5" />}
+                                     isCurrency={false}
+                                     suffix="Orang"
+                                 />
+
+                                <StatCard 
                                     title="Laba Bersih" 
                                     value={stats.netProfit} 
-                                    description="Laba = Omset - HPP - Klaim + Restocking Fees"
+                                    description="Laba = Omset - HPP - Klaim + Denda - Komisi"
                                     icon={<TrendingUp className="h-5 w-5" />}
+                                />
+                                <StatCard 
+                                    title={`Item Terjual (${getMonthName(filters.month)})`} 
+                                    value={stats.soldItemsCount} 
+                                    description="Total unit terinput pada periode ini"
+                                    icon={<Smartphone className="h-5 w-5" />}
+                                    isCurrency={false}
                                 />
                             </>
                         )}
@@ -517,9 +653,9 @@ export default function Dashboard({
                         {!isKaryawan && <DonutChart data={formattedAffiliatorData} title="Komisi Afiliasi" />}
                     </div>
 
-                    {/* Proportional Trend Chart (Bar Chart instead of Line Chart) */}
+                    {/* Proportional Trend Chart (Line Chart) */}
                     <div className="w-full">
-                        <BarChart data={monthlyRevenue} />
+                        <LineChart data={monthlyRevenue} />
                     </div>
 
                     {/* Bottom Section: Recent transactions & Top Selling Products */}
