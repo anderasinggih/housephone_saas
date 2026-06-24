@@ -353,10 +353,33 @@ class StockController extends Controller
             'status' => 'required|in:available,transit,sold',
         ]);
 
+        $wasSold = $stock->status === 'sold';
         $oldValues = $stock->toArray();
-        $stock->update($validated);
 
-        ActivityLog::log('stock_updated', Stock::class, $stock->id, $validated, $oldValues);
+        DB::transaction(function() use ($stock, $validated, $wasSold, $oldValues) {
+            $stock->update($validated);
+
+            if ($wasSold && $stock->status !== 'sold') {
+                $saleItem = \App\Models\SaleItem::where('stock_id', $stock->id)->first();
+                if ($saleItem) {
+                    $sale = \App\Models\Sale::find($saleItem->sale_id);
+                    if ($sale) {
+                        $sale->repairs()->delete();
+                        $sale->returns()->delete();
+                        $sale->extras()->delete();
+                        $sale->items()->delete();
+                        $sale->delete();
+                        
+                        ActivityLog::log('sale_deleted_via_stock_restore', \App\Models\Sale::class, $sale->id, [
+                            'invoice_number' => $sale->invoice_number,
+                            'reason' => 'Unit stock status changed back to available/transit'
+                        ]);
+                    }
+                }
+            }
+
+            ActivityLog::log('stock_updated', Stock::class, $stock->id, $validated, $oldValues);
+        });
 
         return redirect()->back()->with('success', 'Stok unit berhasil diperbarui.');
     }
