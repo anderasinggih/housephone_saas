@@ -239,7 +239,6 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                     {
                         fps: 10,
                         qrbox: (width: number, height: number) => {
-                            // IMEI is a 1D barcode: wide and thin box is optimal
                             return { width: Math.floor(width * 0.85), height: Math.floor(height * 0.4) };
                         }
                     },
@@ -255,7 +254,15 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                     (errorMessage: string) => {
                         // Verbose scanning error logs can go here
                     }
-                ).catch((err: any) => {
+                ).then(() => {
+                    const videoElem = element.querySelector('video');
+                    if (videoElem) {
+                        videoElem.setAttribute('playsinline', 'true');
+                        videoElem.setAttribute('webkit-playsinline', 'true');
+                        videoElem.setAttribute('muted', 'true');
+                        videoElem.muted = true;
+                    }
+                }).catch((err: any) => {
                     setScannerError("Gagal mengakses kamera: " + err.message);
                 });
             }).catch((err) => {
@@ -1642,6 +1649,23 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
             {isScannerOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="w-full max-w-sm rounded-xl bg-card p-5 shadow-xl dark:bg-background border dark:border-input space-y-4">
+                        <style>{`
+                            #reader {
+                                width: 100% !important;
+                                height: 100% !important;
+                            }
+                            #reader video {
+                                width: 100% !important;
+                                height: 100% !important;
+                                object-fit: cover !important;
+                            }
+                            #reader__border_path {
+                                stroke: transparent !important;
+                            }
+                            #reader__scan_region {
+                                border: none !important;
+                            }
+                        `}</style>
                         <div className="flex justify-between items-center">
                             <h4 className="text-xs font-black text-foreground uppercase tracking-wider">Scan IMEI / Barcode</h4>
                             <button
@@ -1657,8 +1681,23 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                             Arahkan kamera belakang HP ke barcode IMEI. Pastikan cahaya cukup dan barcode berada di dalam kotak area scan.
                         </p>
 
-                        <div className="relative border border-input rounded-xl overflow-hidden bg-black aspect-video flex items-center justify-center">
+                        <div className="relative border border-input rounded-xl overflow-hidden bg-black h-64 sm:h-72 w-full flex items-center justify-center">
                             <div id="reader" className="w-full h-full"></div>
+                            
+                            {/* Scanning Overlays */}
+                            <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                                {/* Dimmed layer with centered clean viewport */}
+                                <div className="w-[85%] h-[40%] border-2 border-indigo-500 rounded-lg relative flex items-center justify-center shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
+                                    <div className="absolute -top-1 -left-1 w-4 h-4 border-t-4 border-l-4 border-indigo-400 rounded-tl" />
+                                    <div className="absolute -top-1 -right-1 w-4 h-4 border-t-4 border-r-4 border-indigo-400 rounded-tr" />
+                                    <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-4 border-l-4 border-indigo-400 rounded-bl" />
+                                    <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-4 border-r-4 border-indigo-400 rounded-br" />
+                                    
+                                    {/* Scanning laser animation */}
+                                    <div className="w-[95%] h-0.5 bg-indigo-400 shadow-[0_0_6px_#818cf8] absolute animate-bounce" />
+                                </div>
+                            </div>
+
                             {scannerError && (
                                 <div className="absolute inset-0 bg-black/85 flex items-center justify-center p-4 text-center">
                                     <p className="text-xs text-rose-400 font-bold">{scannerError}</p>
