@@ -259,11 +259,11 @@ class DashboardController extends Controller
         $topProducts = DB::table('sale_items')
             ->join('stocks', 'sale_items.stock_id', '=', 'stocks.id')
             ->join('sales', 'sale_items.sale_id', '=', 'sales.id')
-            ->leftJoin('return_logs', function ($join) {
-                $join->on('sale_items.sale_id', '=', 'return_logs.sale_id')
-                     ->on('sale_items.stock_id', '=', 'return_logs.stock_id');
+            ->leftJoin('returns', function ($join) {
+                $join->on('sale_items.sale_id', '=', 'returns.sale_id')
+                     ->on('sale_items.stock_id', '=', 'returns.stock_id');
             })
-            ->whereNull('return_logs.id')
+            ->whereNull('returns.id')
             ->select('stocks.name', DB::raw('SUM(sale_items.qty) as total_sold'))
             ->where('sales.status', 'completed')
             ->whereMonth('sales.created_at', $month)
