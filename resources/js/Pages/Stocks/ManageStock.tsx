@@ -99,6 +99,10 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
     const [trashFilter, setTrashFilter] = useState<'active' | 'trash'>('active');
     const [selectedStockDetail, setSelectedStockDetail] = useState<StockItem | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({
+        key: 'created_at',
+        direction: 'desc'
+    });
 
     const uniqueProductNames = Array.from(new Set(stocks.map(s => s.name).filter(Boolean)));
 
@@ -119,6 +123,82 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
             (item.store?.name && item.store.name.toLowerCase().includes(searchQuery.toLowerCase()));
         return matchesSearch;
     });
+
+    const getSortValue = (item: StockItem, key: string) => {
+        const saleItem = item.sale_items && item.sale_items[0];
+        const sale = saleItem?.sale;
+        
+        switch (key) {
+            case 'created_at':
+                return item.created_at ? new Date(item.created_at).getTime() : 0;
+            case 'sold_date':
+                return (item.status === 'sold' && sale?.created_at) ? new Date(sale.created_at).getTime() : 0;
+            case 'store':
+                return item.store?.name || 'Gudang Utama';
+            case 'type':
+                return item.type || '';
+            case 'color':
+                return item.color?.value || '';
+            case 'memory':
+                return item.memory?.value || '';
+            case 'serial_number':
+                return item.serial_number || '';
+            case 'imei_1':
+                return item.imei_1 || '';
+            case 'license':
+                return item.license?.value || '';
+            case 'buy_price':
+                return item.buy_price ? parseFloat(item.buy_price as any) : 0;
+            case 'sell_price':
+                return item.sell_price ? parseFloat(item.sell_price as any) : 0;
+            case 'actual_sell_price':
+                return (item.status === 'sold' && saleItem?.actual_sell_price) ? parseFloat(saleItem.actual_sell_price as any) : 0;
+            case 'actual_affiliate_fee':
+                return (item.status === 'sold' && sale?.affiliate_fee) ? parseFloat(sale.affiliate_fee as any) : 0;
+            case 'actual_profit': {
+                const buyPrice = item.buy_price ? parseFloat(item.buy_price as any) : 0;
+                const actualSellPrice = (item.status === 'sold' && saleItem?.actual_sell_price) ? parseFloat(saleItem.actual_sell_price as any) : 0;
+                const actualAffiliateFee = (item.status === 'sold' && sale?.affiliate_fee) ? parseFloat(sale.affiliate_fee as any) : 0;
+                return actualSellPrice > 0 ? (actualSellPrice - buyPrice - actualAffiliateFee) : 0;
+            }
+            case 'sold_in':
+                return (item.status === 'sold' && sale?.invoice_number) ? sale.invoice_number : '';
+            case 'affiliator':
+                return (item.status === 'sold' && sale?.affiliate_user?.name) ? sale.affiliate_user.name : '';
+            case 'buyer':
+                return (item.status === 'sold' && sale?.buyer?.name) ? sale.buyer.name : '';
+            case 'status':
+                return item.deleted_at ? 'trash' : item.status;
+            default:
+                return '';
+        }
+    };
+
+    const sortedStocks = [...filteredStocks].sort((a, b) => {
+        const aVal = getSortValue(a, sortConfig.key);
+        const bVal = getSortValue(b, sortConfig.key);
+
+        if (aVal === bVal) return 0;
+        
+        if (typeof aVal === 'number' && typeof bVal === 'number') {
+            return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
+        }
+        
+        const aStr = String(aVal).toLowerCase();
+        const bStr = String(bVal).toLowerCase();
+        
+        return sortConfig.direction === 'asc' 
+            ? aStr.localeCompare(bStr)
+            : bStr.localeCompare(aStr);
+    });
+
+    const requestSort = (key: string) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
 
     // Barcode scan refs
     const imeiSingleRef = useRef<HTMLInputElement>(null);
@@ -362,34 +442,78 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                 <div className="overflow-x-auto">
                                     <table className="w-full min-w-[1050px] text-left border-collapse">
                                         <thead>
-                                            <tr className="border-b border-border dark:border-input text-[11px] font-bold uppercase tracking-wider text-gray-400">
-                                                <th className="pb-3 font-semibold px-3 whitespace-nowrap text-left">Stock Date</th>
-                                                <th className="pb-3 font-semibold px-3 whitespace-nowrap text-left">Sold Date</th>
-                                                <th className="pb-3 font-semibold px-3 whitespace-nowrap text-left">Stock For</th>
-                                                <th className="pb-3 font-semibold px-3 whitespace-nowrap text-left">Type</th>
-                                                <th className="pb-3 font-semibold px-3 whitespace-nowrap text-left">Color</th>
-                                                <th className="pb-3 font-semibold px-3 whitespace-nowrap text-left">Memory</th>
-                                                <th className="pb-3 font-semibold px-3 whitespace-nowrap text-left">Serial Number</th>
-                                                <th className="pb-3 font-semibold px-3 whitespace-nowrap text-left">IMEI</th>
-                                                <th className="pb-3 font-semibold px-3 whitespace-nowrap text-left">License</th>
-                                                {isSuperAdmin && <th className="pb-3 font-semibold px-3 whitespace-nowrap text-left">Buy Price</th>}
-                                                <th className="pb-3 font-semibold px-3 whitespace-nowrap text-left">Sell Price</th>
-                                                {isSuperAdmin && <th className="pb-3 font-semibold px-3 whitespace-nowrap text-left">Actual Sell Price</th>}
-                                                {isSuperAdmin && <th className="pb-3 font-semibold px-3 whitespace-nowrap text-left">Actual Affiliate Fee</th>}
-                                                {isSuperAdmin && <th className="pb-3 font-semibold px-3 whitespace-nowrap text-left">Actual Profit</th>}
-                                                <th className="pb-3 font-semibold px-3 whitespace-nowrap text-left">Sold In</th>
-                                                <th className="pb-3 font-semibold px-3 whitespace-nowrap text-left">Affiliator</th>
-                                                <th className="pb-3 font-semibold px-3 whitespace-nowrap text-left">Buyer</th>
-                                                <th className="pb-3 font-semibold text-right px-3 whitespace-nowrap">Status</th>
+                                            <tr className="border-b border-border dark:border-input text-[11px] font-bold uppercase tracking-wider text-gray-400 select-none">
+                                                <th onClick={() => requestSort('created_at')} className="pb-3 font-semibold px-3 whitespace-nowrap text-left cursor-pointer hover:text-foreground">
+                                                    Stock Date {sortConfig.key === 'created_at' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                                </th>
+                                                <th onClick={() => requestSort('sold_date')} className="pb-3 font-semibold px-3 whitespace-nowrap text-left cursor-pointer hover:text-foreground">
+                                                    Sold Date {sortConfig.key === 'sold_date' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                                </th>
+                                                <th onClick={() => requestSort('store')} className="pb-3 font-semibold px-3 whitespace-nowrap text-left cursor-pointer hover:text-foreground">
+                                                    Stock For {sortConfig.key === 'store' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                                </th>
+                                                <th onClick={() => requestSort('type')} className="pb-3 font-semibold px-3 whitespace-nowrap text-left cursor-pointer hover:text-foreground">
+                                                    Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                                </th>
+                                                <th onClick={() => requestSort('color')} className="pb-3 font-semibold px-3 whitespace-nowrap text-left cursor-pointer hover:text-foreground">
+                                                    Color {sortConfig.key === 'color' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                                </th>
+                                                <th onClick={() => requestSort('memory')} className="pb-3 font-semibold px-3 whitespace-nowrap text-left cursor-pointer hover:text-foreground">
+                                                    Memory {sortConfig.key === 'memory' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                                </th>
+                                                <th onClick={() => requestSort('serial_number')} className="pb-3 font-semibold px-3 whitespace-nowrap text-left cursor-pointer hover:text-foreground">
+                                                    Serial Number {sortConfig.key === 'serial_number' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                                </th>
+                                                <th onClick={() => requestSort('imei_1')} className="pb-3 font-semibold px-3 whitespace-nowrap text-left cursor-pointer hover:text-foreground">
+                                                    IMEI {sortConfig.key === 'imei_1' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                                </th>
+                                                <th onClick={() => requestSort('license')} className="pb-3 font-semibold px-3 whitespace-nowrap text-left cursor-pointer hover:text-foreground">
+                                                    License {sortConfig.key === 'license' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                                </th>
+                                                {isSuperAdmin && (
+                                                    <th onClick={() => requestSort('buy_price')} className="pb-3 font-semibold px-3 whitespace-nowrap text-left cursor-pointer hover:text-foreground">
+                                                        Buy Price {sortConfig.key === 'buy_price' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                                    </th>
+                                                )}
+                                                <th onClick={() => requestSort('sell_price')} className="pb-3 font-semibold px-3 whitespace-nowrap text-left cursor-pointer hover:text-foreground">
+                                                    Sell Price {sortConfig.key === 'sell_price' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                                </th>
+                                                {isSuperAdmin && (
+                                                    <th onClick={() => requestSort('actual_sell_price')} className="pb-3 font-semibold px-3 whitespace-nowrap text-left cursor-pointer hover:text-foreground">
+                                                        Actual Sell {sortConfig.key === 'actual_sell_price' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                                    </th>
+                                                )}
+                                                {isSuperAdmin && (
+                                                    <th onClick={() => requestSort('actual_affiliate_fee')} className="pb-3 font-semibold px-3 whitespace-nowrap text-left cursor-pointer hover:text-foreground">
+                                                        Affiliate Fee {sortConfig.key === 'actual_affiliate_fee' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                                    </th>
+                                                )}
+                                                {isSuperAdmin && (
+                                                    <th onClick={() => requestSort('actual_profit')} className="pb-3 font-semibold px-3 whitespace-nowrap text-left cursor-pointer hover:text-foreground">
+                                                        Profit {sortConfig.key === 'actual_profit' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                                    </th>
+                                                )}
+                                                <th onClick={() => requestSort('sold_in')} className="pb-3 font-semibold px-3 whitespace-nowrap text-left cursor-pointer hover:text-foreground">
+                                                    Sold In {sortConfig.key === 'sold_in' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                                </th>
+                                                <th onClick={() => requestSort('affiliator')} className="pb-3 font-semibold px-3 whitespace-nowrap text-left cursor-pointer hover:text-foreground">
+                                                    Affiliator {sortConfig.key === 'affiliator' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                                </th>
+                                                <th onClick={() => requestSort('buyer')} className="pb-3 font-semibold px-3 whitespace-nowrap text-left cursor-pointer hover:text-foreground">
+                                                    Buyer {sortConfig.key === 'buyer' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                                </th>
+                                                <th onClick={() => requestSort('status')} className="pb-3 font-semibold text-right px-3 whitespace-nowrap cursor-pointer hover:text-foreground">
+                                                    Status {sortConfig.key === 'status' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                                </th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-xs font-semibold text-gray-700 dark:text-gray-300">
-                                            {filteredStocks.length === 0 ? (
+                                            {sortedStocks.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan={isSuperAdmin ? 17 : 13} className="py-8 text-center text-gray-400">Belum ada data unit dalam sistem.</td>
+                                                    <td colSpan={isSuperAdmin ? 18 : 14} className="py-8 text-center text-gray-400">Belum ada data unit dalam sistem.</td>
                                                 </tr>
                                             ) : (
-                                                filteredStocks.map((item) => {
+                                                sortedStocks.map((item) => {
                                                     const saleItem = item.sale_items && item.sale_items[0];
                                                     const sale = saleItem?.sale;
                                                     const stockDate = item.created_at ? new Date(item.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-';
