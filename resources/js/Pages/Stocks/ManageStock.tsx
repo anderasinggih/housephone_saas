@@ -219,6 +219,70 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
     // Barcode scan refs
     const imeiSingleRef = useRef<HTMLInputElement>(null);
 
+    // Camera scanner state
+    const [isScannerOpen, setIsScannerOpen] = useState(false);
+    const [scannerInstance, setScannerInstance] = useState<any>(null);
+    const [scannerError, setScannerError] = useState<string | null>(null);
+
+    useEffect(() => {
+        let html5Qrcode: any = null;
+        if (isScannerOpen) {
+            import('html5-qrcode').then(({ Html5Qrcode }) => {
+                const element = document.getElementById("reader");
+                if (!element) return;
+                
+                html5Qrcode = new Html5Qrcode("reader");
+                setScannerInstance(html5Qrcode);
+                
+                html5Qrcode.start(
+                    { facingMode: "environment" },
+                    {
+                        fps: 10,
+                        qrbox: (width: number, height: number) => {
+                            // IMEI is a 1D barcode: wide and thin box is optimal
+                            return { width: Math.floor(width * 0.85), height: Math.floor(height * 0.4) };
+                        }
+                    },
+                    (decodedText: string) => {
+                        singleForm.setData('imei_1', decodedText);
+                        html5Qrcode.stop().then(() => {
+                            setIsScannerOpen(false);
+                        }).catch((err: any) => {
+                            console.error(err);
+                            setIsScannerOpen(false);
+                        });
+                    },
+                    (errorMessage: string) => {
+                        // Verbose scanning error logs can go here
+                    }
+                ).catch((err: any) => {
+                    setScannerError("Gagal mengakses kamera: " + err.message);
+                });
+            }).catch((err) => {
+                setScannerError("Gagal memuat modul scanner: " + err.message);
+            });
+        }
+
+        return () => {
+            if (html5Qrcode && html5Qrcode.isScanning) {
+                html5Qrcode.stop().catch((err: any) => console.error(err));
+            }
+        };
+    }, [isScannerOpen]);
+
+    const closeScanner = () => {
+        if (scannerInstance && scannerInstance.isScanning) {
+            scannerInstance.stop().then(() => {
+                setIsScannerOpen(false);
+            }).catch((err: any) => {
+                console.error(err);
+                setIsScannerOpen(false);
+            });
+        } else {
+            setIsScannerOpen(false);
+        }
+    };
+
     // Single Stock Form — use empty string for price fields to avoid 0 prefill
     const singleForm = useForm({
         store_id: stores[0]?.id || '',
@@ -1160,15 +1224,15 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                         />
                                                         <button
                                                             type="button"
-                                                            onClick={() => imeiSingleRef.current?.focus()}
-                                                            title="Klik lalu scan barcode IMEI"
+                                                            onClick={() => setIsScannerOpen(true)}
+                                                            title="Scan IMEI dengan kamera"
                                                             className="rounded-xl border border-input bg-muted px-3 py-2 text-gray-500 hover:bg-accent transition"
                                                         >
                                                             <QrCode className="h-4 w-4" />
                                                         </button>
                                                     </div>
                                                     {singleForm.errors.imei_1 && <p className="mt-1 text-xs text-rose-500">{singleForm.errors.imei_1}</p>}
-                                                    <p className="text-[10px] text-gray-400 mt-0.5">Klik ikon QR lalu scan barcode untuk isi otomatis</p>
+                                                    <p className="text-[10px] text-gray-400 mt-0.5">Klik ikon QR untuk scan pakai kamera, atau fokus ke kolom untuk scan dengan scanner fisik.</p>
                                                 </div>
                                             </>
                                         )}
@@ -1573,6 +1637,47 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                     </datalist>
                 </div>
             </div>
+
+            {/* ── CAMERA SCANNER MODAL ── */}
+            {isScannerOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="w-full max-w-sm rounded-xl bg-card p-5 shadow-xl dark:bg-background border dark:border-input space-y-4">
+                        <div className="flex justify-between items-center">
+                            <h4 className="text-xs font-black text-foreground uppercase tracking-wider">Scan IMEI / Barcode</h4>
+                            <button
+                                type="button"
+                                onClick={closeScanner}
+                                className="text-gray-400 hover:text-foreground text-xs font-bold"
+                            >
+                                Tutup
+                            </button>
+                        </div>
+                        
+                        <p className="text-[10px] text-gray-400 leading-normal">
+                            Arahkan kamera belakang HP ke barcode IMEI. Pastikan cahaya cukup dan barcode berada di dalam kotak area scan.
+                        </p>
+
+                        <div className="relative border border-input rounded-xl overflow-hidden bg-black aspect-video flex items-center justify-center">
+                            <div id="reader" className="w-full h-full"></div>
+                            {scannerError && (
+                                <div className="absolute inset-0 bg-black/85 flex items-center justify-center p-4 text-center">
+                                    <p className="text-xs text-rose-400 font-bold">{scannerError}</p>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={closeScanner}
+                                className="w-full rounded-xl border border-input py-2 text-xs font-semibold text-gray-500 hover:bg-muted"
+                            >
+                                Batal
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </AuthenticatedLayout>
     );
 }
