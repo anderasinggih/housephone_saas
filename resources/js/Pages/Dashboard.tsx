@@ -146,6 +146,30 @@ function DonutChart({ data, title, isCurrency = false }: { data: Array<{ label: 
 
 // Custom Premium Line Chart Component (Stockbit style area line chart that fits wall-to-wall without distortion)
 function LineChart({ data }: { data: Array<{ month: string; revenue: number }> }) {
+    if (!data || data.length === 0) {
+        return (
+            <div className="rounded-lg border border-border bg-card p-4 shadow-sm flex flex-col justify-between h-[380px] md:h-[450px] text-card-foreground">
+                <div className="flex items-center justify-between mb-4 border-b border-border/40 pb-2">
+                    <div className="flex flex-col">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Tren Omset Bulanan</span>
+                        <span className="text-lg sm:text-xl font-black text-emerald-500 tracking-tight mt-0.5">
+                            Rp 0
+                        </span>
+                    </div>
+                    <div className="flex flex-col items-end">
+                        <span className="text-[9px] font-bold text-muted-foreground uppercase">Periode Aktif</span>
+                        <span className="text-xs font-extrabold text-foreground mt-0.5">
+                            -
+                        </span>
+                    </div>
+                </div>
+                <div className="flex-1 flex items-center justify-center text-xs font-semibold text-muted-foreground">
+                    Tidak ada data transaksi bulanan
+                </div>
+            </div>
+        );
+    }
+
     const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
     const formatIDR = (val: number) => {
