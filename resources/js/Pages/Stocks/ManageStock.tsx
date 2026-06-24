@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, useForm, router, usePage } from '@inertiajs/react';
-import { useState, useRef } from 'react';
+import { useState, useRef, Fragment } from 'react';
 import { 
     Smartphone, 
     Layers, 
@@ -178,6 +178,14 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
     };
 
     const sortedStocks = [...filteredStocks].sort((a, b) => {
+        // Primary sort: non-sold (available, transit) first (0), sold middle (1), deleted/trash last (2)
+        const aStatusOrder = a.deleted_at ? 2 : (a.status === 'sold' ? 1 : 0);
+        const bStatusOrder = b.deleted_at ? 2 : (b.status === 'sold' ? 1 : 0);
+
+        if (aStatusOrder !== bStatusOrder) {
+            return aStatusOrder - bStatusOrder;
+        }
+
         const aVal = getSortValue(a, sortConfig.key);
         const bVal = getSortValue(b, sortConfig.key);
 
@@ -548,7 +556,14 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                     <td colSpan={isSuperAdmin ? 19 : 15} className="py-8 text-center text-gray-400">Belum ada data unit dalam sistem.</td>
                                                 </tr>
                                             ) : (
-                                                sortedStocks.map((item) => {
+                                                [...sortedStocks].sort((a, b) => {
+                                                    const order = { 'available': 1, 'transit': 2, 'sold': 3 };
+                                                    return (order[a.status as keyof typeof order] || 4) - (order[b.status as keyof typeof order] || 4);
+                                                }).map((item, idx) => {
+                                                    const prevItem = idx > 0 ? sortedStocks[idx - 1] : null;
+                                                    const showSoldDivider = prevItem && (prevItem.status !== 'sold' && !prevItem.deleted_at) && (item.status === 'sold' && !item.deleted_at);
+                                                    const showTrashDivider = prevItem && !prevItem.deleted_at && item.deleted_at;
+
                                                     const saleItem = item.sale_items && item.sale_items[0];
                                                     const sale = saleItem?.sale;
                                                     const stockDate = item.created_at ? new Date(item.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-';
@@ -572,67 +587,94 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                     const isSelected = selectedStockDetail?.id === item.id;
  
                                                     return (
-                                                        <tr 
-                                                            key={item.id} 
-                                                            onClick={() => setSelectedStockDetail(item)}
-                                                            className={`cursor-pointer hover:bg-muted/50 dark:hover:bg-gray-900/50 transition-colors ${
-                                                                isSelected ? 'bg-indigo-50/40 dark:bg-indigo-950/20' : ''
-                                                            }`}
-                                                        >
-                                                            <td className="py-4 px-3 font-medium whitespace-nowrap text-left">{stockDate}</td>
-                                                            <td className="py-4 px-3 font-bold text-xs whitespace-nowrap text-left">{item.name}</td>
-                                                            <td className="py-4 px-3 font-medium whitespace-nowrap text-left">{soldDate}</td>
-                                                            <td className="py-4 px-3 font-bold text-xs whitespace-nowrap text-left">{stockFor}</td>
-                                                            <td className="py-4 px-3 uppercase text-[10px] font-bold text-indigo-500 whitespace-nowrap text-left">{typeText}</td>
-                                                            <td className="py-4 px-3 whitespace-nowrap text-left">{colorText}</td>
-                                                            <td className="py-4 px-3 whitespace-nowrap text-left">{memoryText}</td>
-                                                            <td className="py-2.5 px-3 font-mono text-[11px] whitespace-nowrap max-w-[120px] text-left">
-                                                                <span className="truncate block">{item.serial_number || '-'}</span>
-                                                            </td>
-                                                            <td className="py-2.5 px-3 font-mono text-[11px] whitespace-nowrap max-w-[130px] text-left">
-                                                                <span className="truncate block">{item.imei_1 || '-'}</span>
-                                                            </td>
-                                                            <td className="py-4 px-3 whitespace-nowrap text-left">{licenseText}</td>
-                                                            {isSuperAdmin && (
-                                                                <td className="py-4 px-3 font-bold text-indigo-600 dark:text-indigo-400 whitespace-nowrap text-left">
-                                                                    {formatCurrency(buyPrice)}
-                                                                </td>
+                                                        <Fragment key={item.id}>
+                                                            {showSoldDivider && (
+                                                                <tr className="bg-rose-500/5 dark:bg-rose-950/10 select-none">
+                                                                    <td colSpan={isSuperAdmin ? 19 : 15} className="py-2.5 px-3 border-y border-rose-100 dark:border-rose-950/40 text-center">
+                                                                        <div className="flex items-center justify-center gap-2">
+                                                                            <div className="h-px bg-rose-200 dark:bg-rose-950 flex-1" />
+                                                                            <span className="text-[10px] font-black tracking-wider uppercase text-rose-600 dark:text-rose-400 bg-rose-500/10 px-2.5 py-0.5 rounded border border-rose-500/20">
+                                                                                UNIT SUDAH TERJUAL (SOLD)
+                                                                            </span>
+                                                                            <div className="h-px bg-rose-200 dark:bg-rose-950 flex-1" />
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
                                                             )}
-                                                            <td className="py-4 px-3 font-bold whitespace-nowrap text-left">
-                                                                {formatCurrency(sellPrice)}
-                                                            </td>
-                                                            {isSuperAdmin && (
-                                                                <td className="py-4 px-3 font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap text-left">
-                                                                    {actualSellPrice > 0 ? formatCurrency(actualSellPrice) : '-'}
-                                                                </td>
+                                                            {showTrashDivider && (
+                                                                <tr className="bg-gray-500/5 dark:bg-gray-900/10 select-none">
+                                                                    <td colSpan={isSuperAdmin ? 19 : 15} className="py-2.5 px-3 border-y border-gray-200 dark:border-gray-800 text-center">
+                                                                        <div className="flex items-center justify-center gap-2">
+                                                                            <div className="h-px bg-gray-200 dark:bg-gray-800 flex-1" />
+                                                                            <span className="text-[10px] font-black tracking-wider uppercase text-gray-500 dark:text-gray-400 bg-gray-500/10 px-2.5 py-0.5 rounded border border-gray-500/20">
+                                                                                UNIT DI TEMPAT SAMPAH (TRASH)
+                                                                            </span>
+                                                                            <div className="h-px bg-gray-200 dark:bg-gray-800 flex-1" />
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
                                                             )}
-                                                            {isSuperAdmin && (
-                                                                <td className="py-4 px-3 font-medium text-amber-600 dark:text-amber-400 whitespace-nowrap text-left">
-                                                                    {actualAffiliateFee > 0 ? formatCurrency(actualAffiliateFee) : '-'}
+                                                            <tr 
+                                                                onClick={() => setSelectedStockDetail(item)}
+                                                                className={`cursor-pointer hover:bg-muted/50 dark:hover:bg-gray-900/50 transition-colors ${
+                                                                    isSelected ? 'bg-indigo-50/40 dark:bg-indigo-950/20' : ''
+                                                                }`}
+                                                            >
+                                                                <td className="py-4 px-3 font-medium whitespace-nowrap text-left">{stockDate}</td>
+                                                                <td className="py-4 px-3 font-bold text-xs whitespace-nowrap text-left">{item.name}</td>
+                                                                <td className="py-4 px-3 font-medium whitespace-nowrap text-left">{soldDate}</td>
+                                                                <td className="py-4 px-3 font-bold text-xs whitespace-nowrap text-left">{stockFor}</td>
+                                                                <td className="py-4 px-3 uppercase text-[10px] font-bold text-indigo-500 whitespace-nowrap text-left">{typeText}</td>
+                                                                <td className="py-4 px-3 whitespace-nowrap text-left">{colorText}</td>
+                                                                <td className="py-4 px-3 whitespace-nowrap text-left">{memoryText}</td>
+                                                                <td className="py-2.5 px-3 font-mono text-[11px] whitespace-nowrap max-w-[120px] text-left">
+                                                                    <span className="truncate block">{item.serial_number || '-'}</span>
                                                                 </td>
-                                                            )}
-                                                            {isSuperAdmin && (
-                                                                <td className={`py-4 px-3 font-bold whitespace-nowrap text-left ${actualProfit >= 0 ? 'text-teal-600 dark:text-teal-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                                                                    {actualSellPrice > 0 ? formatCurrency(actualProfit) : '-'}
+                                                                <td className="py-2.5 px-3 font-mono text-[11px] whitespace-nowrap max-w-[130px] text-left">
+                                                                    <span className="truncate block">{item.imei_1 || '-'}</span>
                                                                 </td>
-                                                            )}
-                                                            <td className="py-4 px-3 font-mono text-[10px] whitespace-nowrap text-left">{soldIn}</td>
-                                                            <td className="py-4 px-3 whitespace-nowrap text-left">{affiliatorName}</td>
-                                                            <td className="py-4 px-3 whitespace-nowrap text-left">{buyerName}</td>
-                                                            <td className="py-4 text-right px-3 whitespace-nowrap">
-                                                                <span className={`inline-flex rounded px-2 py-0.5 text-[10px] font-bold uppercase ${
-                                                                    item.deleted_at
-                                                                        ? 'bg-gray-500/10 text-gray-600 dark:text-gray-400 border border-gray-500/20'
-                                                                        : item.status === 'available' 
-                                                                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' 
-                                                                            : item.status === 'transit' 
-                                                                                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
-                                                                                : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
-                                                                }`}>
-                                                                    {item.deleted_at ? 'TRASH' : item.status}
-                                                                </span>
-                                                            </td>
-                                                        </tr>
+                                                                <td className="py-4 px-3 whitespace-nowrap text-left">{licenseText}</td>
+                                                                {isSuperAdmin && (
+                                                                    <td className="py-4 px-3 font-bold text-indigo-600 dark:text-indigo-400 whitespace-nowrap text-left">
+                                                                        {formatCurrency(buyPrice)}
+                                                                    </td>
+                                                                )}
+                                                                <td className="py-4 px-3 font-bold whitespace-nowrap text-left">
+                                                                    {formatCurrency(sellPrice)}
+                                                                </td>
+                                                                {isSuperAdmin && (
+                                                                    <td className="py-4 px-3 font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap text-left">
+                                                                        {actualSellPrice > 0 ? formatCurrency(actualSellPrice) : '-'}
+                                                                    </td>
+                                                                )}
+                                                                {isSuperAdmin && (
+                                                                    <td className="py-4 px-3 font-medium text-amber-600 dark:text-amber-400 whitespace-nowrap text-left">
+                                                                        {actualAffiliateFee > 0 ? formatCurrency(actualAffiliateFee) : '-'}
+                                                                    </td>
+                                                                )}
+                                                                {isSuperAdmin && (
+                                                                    <td className={`py-4 px-3 font-bold whitespace-nowrap text-left ${actualProfit >= 0 ? 'text-teal-600 dark:text-teal-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                                                        {actualSellPrice > 0 ? formatCurrency(actualProfit) : '-'}
+                                                                    </td>
+                                                                )}
+                                                                <td className="py-4 px-3 font-mono text-[10px] whitespace-nowrap text-left">{soldIn}</td>
+                                                                <td className="py-4 px-3 whitespace-nowrap text-left">{affiliatorName}</td>
+                                                                <td className="py-4 px-3 whitespace-nowrap text-left">{buyerName}</td>
+                                                                <td className="py-4 text-right px-3 whitespace-nowrap">
+                                                                    <span className={`inline-flex rounded px-2 py-0.5 text-[10px] font-bold uppercase ${
+                                                                        item.deleted_at
+                                                                            ? 'bg-gray-500/10 text-gray-600 dark:text-gray-400 border border-gray-500/20'
+                                                                            : item.status === 'available' 
+                                                                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' 
+                                                                                : item.status === 'transit' 
+                                                                                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                                                                                    : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                                                                    }`}>
+                                                                        {item.deleted_at ? 'TRASH' : item.status}
+                                                                    </span>
+                                                                </td>
+                                                            </tr>
+                                                        </Fragment>
                                                     );
                                                 })
                                             )}
