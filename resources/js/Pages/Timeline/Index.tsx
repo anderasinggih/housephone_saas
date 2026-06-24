@@ -135,23 +135,12 @@ export default function Timeline({ activities }: TimelineProps) {
                 };
             case 'stock_transfer_initiated':
                 return {
-                    title: 'Mutasi Stok Diajukan',
+                    title: 'Mutasi Unit',
                     icon: ArrowLeftRight,
-                    colorClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
+                    colorClass: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20',
                     desc: (
                         <span>
-                            Mengajukan mutasi langsung unit <strong className="text-foreground font-semibold">{vals.stock_name || 'Unit'}</strong> {vals.serial_number && `(SN: ${vals.serial_number})`} ke cabang tujuan.
-                        </span>
-                    )
-                };
-            case 'stock_transfer_approved':
-                return {
-                    title: 'Mutasi Disetujui',
-                    icon: CheckSquare,
-                    colorClass: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20',
-                    desc: (
-                        <span>
-                            Mutasi unit <strong className="text-foreground font-semibold">{vals.stock_name || 'Unit'}</strong> {vals.serial_number && `(SN: ${vals.serial_number})`} telah disetujui dan berhasil diterima di cabang tujuan.
+                            Memutasi unit <strong className="text-foreground font-semibold">{vals.stock_name || 'Unit'}</strong> {vals.serial_number && `(SN: ${vals.serial_number})`} ke cabang tujuan.
                         </span>
                     )
                 };
@@ -162,7 +151,7 @@ export default function Timeline({ activities }: TimelineProps) {
                     colorClass: 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20',
                     desc: (
                         <span>
-                            Memulai shift kerja di toko <strong className="text-foreground font-semibold">{vals.store_name || '-'}</strong> dengan modal awal kas laci <strong className="text-foreground font-semibold">{formatCurrency(vals.start_cash)}</strong>.
+                            Memulai shift kerja di toko <strong className="text-foreground font-semibold">{vals.store_name || '-'}</strong>.
                         </span>
                     )
                 };
@@ -173,51 +162,29 @@ export default function Timeline({ activities }: TimelineProps) {
                     colorClass: 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border border-zinc-500/20',
                     desc: (
                         <span>
-                            Menutup shift kasir dengan uang akhir terhitung sebesar <strong className="text-foreground font-semibold">{formatCurrency(vals.end_cash)}</strong>. Selisih laci: <strong className={parseFloat(vals.difference) >= 0 ? 'text-emerald-600' : 'text-rose-600'}>{formatCurrency(vals.difference)}</strong>.
+                            Mengakhiri shift kerja.
                         </span>
                     )
                 };
-            case 'shift_cash_drop':
+            case 'sale_void':
                 return {
-                    title: 'Setoran Cash Drop',
-                    icon: ArrowDownCircle,
-                    colorClass: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20',
-                    desc: (
-                        <span>
-                            Melakukan setoran uang kas (cash drop) sebesar <strong className="text-rose-600 font-bold">{formatCurrency(vals.amount)}</strong>. Keterangan: {vals.description}.
-                        </span>
-                    )
-                };
-            case 'shift_petty_cash':
-                return {
-                    title: 'Kas Kecil (Petty)',
-                    icon: DollarSign,
-                    colorClass: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20',
-                    desc: (
-                        <span>
-                            Pencatatan kas operasional kecil bernilai <strong className="text-foreground font-semibold">{formatCurrency(vals.amount)}</strong> tipe <strong className="uppercase font-bold">{vals.type === 'in' ? 'Masuk (In)' : 'Keluar (Out)'}</strong>. Keperluan: {vals.description}.
-                        </span>
-                    )
-                };
-            case 'sale_void_requested':
-                return {
-                    title: 'Void Diajukan',
-                    icon: AlertTriangle,
-                    colorClass: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20',
-                    desc: (
-                        <span>
-                            Mengajukan pembatalan transaksi (void) untuk invoice <strong className="text-foreground font-semibold">{vals.invoice_number}</strong>. Alasan: "{vals.void_reason}".
-                        </span>
-                    )
-                };
-            case 'sale_void_approved':
-                return {
-                    title: 'Void Disetujui',
+                    title: 'Void Transaksi',
                     icon: XCircle,
                     colorClass: 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20',
                     desc: (
                         <span>
-                            Persetujuan pembatalan transaksi (void) untuk invoice <strong className="text-foreground font-semibold">{vals.invoice_number}</strong>. Unit dikembalikan ke inventori cabang terkait.
+                            Membatalkan transaksi penjualan invoice <strong className="text-foreground font-semibold">{vals.invoice_number}</strong>. Alasan: "{vals.void_reason || '-'}".
+                        </span>
+                    )
+                };
+            case 'sale_deleted_via_stock_restore':
+                return {
+                    title: 'Penjualan Dihapus',
+                    icon: RotateCcw,
+                    colorClass: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20',
+                    desc: (
+                        <span>
+                            Transaksi penjualan invoice <strong className="text-foreground font-semibold">{vals.invoice_number}</strong> otomatis dihapus karena status unit dikembalikan ke Ready Stock / Transit.
                         </span>
                     )
                 };
@@ -357,14 +324,11 @@ export default function Timeline({ activities }: TimelineProps) {
                                         <option value="">Semua Aktivitas</option>
                                         <option value="add_stock">Tambah Stok</option>
                                         <option value="sale_checkout">Penjualan</option>
-                                        <option value="stock_transfer_initiated">Mutasi Diajukan</option>
-                                        <option value="stock_transfer_approved">Mutasi Disetujui</option>
+                                        <option value="stock_transfer_initiated">Mutasi Unit</option>
                                         <option value="shift_clock_in">Clock In</option>
                                         <option value="shift_clock_out">Clock Out</option>
-                                        <option value="shift_cash_drop">Setoran Cash Drop</option>
-                                        <option value="shift_petty_cash">Kas Kecil</option>
-                                        <option value="sale_void_requested">Void Diajukan</option>
-                                        <option value="sale_void_approved">Void Disetujui</option>
+                                        <option value="sale_void">Void Transaksi</option>
+                                        <option value="sale_deleted_via_stock_restore">Penjualan Dihapus</option>
                                         <option value="sale_return">Retur Barang</option>
                                         <option value="warranty_claim">Klaim Garansi</option>
                                         <option value="warranty_update">Servis Diperbarui</option>

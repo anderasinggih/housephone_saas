@@ -353,13 +353,30 @@ class StockController extends Controller
             'qty' => 'required|integer|min:1',
             'status' => 'required|in:available,transit,sold',
             'default_charge_to' => 'nullable|in:buyer,seller,free_promotion',
+            'buyer_name' => 'nullable|string|max:255',
+            'buyer_phone' => 'nullable|string|max:50',
+            'buyer_address' => 'nullable|string|max:500',
         ]);
 
         $wasSold = $stock->status === 'sold';
         $oldValues = $stock->toArray();
 
-        DB::transaction(function() use ($stock, $validated, $wasSold, $oldValues) {
-            $stock->update($validated);
+        DB::transaction(function() use ($stock, $validated, $wasSold, $oldValues, $request) {
+            $stockFields = collect($validated)->except(['buyer_name', 'buyer_phone', 'buyer_address'])->toArray();
+            $stock->update($stockFields);
+
+            if ($stock->status === 'sold') {
+                $saleItem = \App\Models\SaleItem::where('stock_id', $stock->id)->first();
+                if ($saleItem && $sale = \App\Models\Sale::find($saleItem->sale_id)) {
+                    if ($buyer = \App\Models\Buyer::find($sale->buyer_id)) {
+                        $buyer->update([
+                            'name' => $request->input('buyer_name') ?? $buyer->name,
+                            'phone' => $request->input('buyer_phone') ?? $buyer->phone,
+                            'address' => $request->input('buyer_address') ?? $buyer->address,
+                        ]);
+                    }
+                }
+            }
 
             if ($wasSold && $stock->status !== 'sold') {
                 $saleItem = \App\Models\SaleItem::where('stock_id', $stock->id)->first();

@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, useForm, router, usePage } from '@inertiajs/react';
-import { useState, useRef, Fragment } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import { 
     Smartphone, 
     Layers, 
@@ -104,6 +104,11 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
         key: 'created_at',
         direction: 'desc'
     });
+    const [currentPage, setCurrentPage] = useState(1);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, storeFilterId, trashFilter]);
 
     const uniqueProductNames = Array.from(new Set(stocks.map(s => s.name).filter(Boolean)));
 
@@ -253,10 +258,15 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
         sell_price_reseller: '' as string | number,
         qty: 1,
         status: 'available' as 'available' | 'transit' | 'sold',
-        default_charge_to: 'buyer' as 'buyer' | 'seller' | 'free_promotion'
+        default_charge_to: 'buyer' as 'buyer' | 'seller' | 'free_promotion',
+        buyer_name: '',
+        buyer_phone: '',
+        buyer_address: ''
     });
 
     const openEditModal = (stock: StockItem) => {
+        const sale = stock.sale_items?.[0]?.sale;
+        const buyer = sale?.buyer as any;
         editForm.setData({
             store_id: stock.store_id || '',
             category: stock.category || 'iphone',
@@ -275,7 +285,10 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
             sell_price_reseller: stock.sell_price_reseller ? Math.round(parseFloat(stock.sell_price_reseller as any)) : '',
             qty: stock.qty || 1,
             status: stock.status || 'available',
-            default_charge_to: (stock as any).default_charge_to || 'buyer'
+            default_charge_to: (stock as any).default_charge_to || 'buyer',
+            buyer_name: buyer?.name || '',
+            buyer_phone: buyer?.phone || '',
+            buyer_address: buyer?.address || ''
         });
         setIsEditingStock(true);
     };
@@ -403,8 +416,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
     return (
         <AuthenticatedLayout
             header={
-                <div className="flex flex-col justify-end gap-3 sm:flex-row sm:items-center w-full">
-                    <div className="flex flex-wrap items-center gap-2 ml-auto w-full sm:w-auto">
+                <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 justify-end w-full">
                         {!isAddingNewStock && !isEditingStock && (
                             <div className="relative w-full sm:w-60">
                                 <input
@@ -461,7 +473,6 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                 Kembali
                             </button>
                         )}
-                    </div>
                 </div>
             }
         >
@@ -567,9 +578,12 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                     const bOrder = b.deleted_at ? 4 : (order[b.status as keyof typeof order] || 4);
                                                     return aOrder - bOrder;
                                                 });
-                                                return displayItems.map((item, idx) => {
-                                                    const prevItem = idx > 0 ? displayItems[idx - 1] : null;
-                                                    const isFirstItem = idx === 0;
+                                                const itemsPerPage = 50;
+                                                const paginatedItems = displayItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+                                                return paginatedItems.map((item, idx) => {
+                                                    const absoluteIdx = (currentPage - 1) * itemsPerPage + idx;
+                                                    const prevItem = absoluteIdx > 0 ? displayItems[absoluteIdx - 1] : null;
+                                                    const isFirstItem = absoluteIdx === 0;
                                                     // Show available header: first item AND it's available/transit (not sold, not trash)
                                                     const showAvailableHeader = isFirstItem && !item.deleted_at && item.status !== 'sold';
                                                     // Show sold divider: when transitioning from non-sold to sold, OR if first item is already sold
@@ -718,12 +732,63 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                     </table>
                                     </div>
                                 </div>
+                                
+                                {/* Pagination Controls */}
+                                {Math.ceil(sortedStocks.length / 50) > 1 && (
+                                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 mt-4 border-t border-border dark:border-input px-4 sm:px-0 pb-4 sm:pb-0">
+                                        <div className="text-xs text-gray-500 font-medium">
+                                            Menampilkan <span className="font-bold text-foreground">{Math.min(sortedStocks.length, (currentPage - 1) * 50 + 1)}</span> - <span className="font-bold text-foreground">{Math.min(sortedStocks.length, currentPage * 50)}</span> dari <span className="font-bold text-foreground">{sortedStocks.length}</span> unit
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                            <button
+                                                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                                disabled={currentPage === 1}
+                                                className="px-3.5 py-2 rounded-xl border border-input bg-card text-xs font-bold text-foreground hover:bg-muted disabled:opacity-40 transition shadow-sm dark:bg-background"
+                                            >
+                                                Sebelumnya
+                                            </button>
+                                            {(() => {
+                                                const totalPages = Math.ceil(sortedStocks.length / 50);
+                                                const pages = [];
+                                                const maxVisible = 5;
+                                                let start = Math.max(1, currentPage - 2);
+                                                let end = Math.min(totalPages, start + maxVisible - 1);
+                                                if (end - start + 1 < maxVisible) {
+                                                    start = Math.max(1, end - maxVisible + 1);
+                                                }
+                                                for (let i = start; i <= end; i++) {
+                                                    pages.push(
+                                                        <button
+                                                            key={i}
+                                                            onClick={() => setCurrentPage(i)}
+                                                            className={`w-9 h-9 rounded-xl text-xs font-bold transition flex items-center justify-center ${
+                                                                currentPage === i
+                                                                    ? 'bg-indigo-600 text-white shadow-md'
+                                                                    : 'border border-input bg-card text-foreground hover:bg-muted shadow-sm dark:bg-background'
+                                                            }`}
+                                                        >
+                                                            {i}
+                                                        </button>
+                                                    );
+                                                }
+                                                return pages;
+                                            })()}
+                                            <button
+                                                onClick={() => setCurrentPage(prev => Math.min(Math.ceil(sortedStocks.length / 50), prev + 1))}
+                                                disabled={currentPage === Math.ceil(sortedStocks.length / 50)}
+                                                className="px-3.5 py-2 rounded-xl border border-input bg-card text-xs font-bold text-foreground hover:bg-muted disabled:opacity-40 transition shadow-sm dark:bg-background"
+                                            >
+                                                Berikutnya
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                                 </div>
                             </div>
  
                             {/* Detail Panel */}
                             {selectedStockDetail && (
-                                <div className="w-full lg:w-1/3 rounded-lg border border-border bg-card p-6 shadow-sm text-card-foreground space-y-6 self-start lg:sticky lg:top-4 transition-all duration-300">
+                                <div className="w-full lg:w-1/3 rounded-lg border border-border bg-card p-6 shadow-sm text-card-foreground space-y-6 self-start lg:sticky lg:top-4 max-h-[calc(100vh-6rem)] overflow-y-auto transition-all duration-300">
                                     
                                     {/* Breadcrumb & Close Button */}
                                     <div className="flex items-center justify-between border-b border-border dark:border-input pb-3">
@@ -774,27 +839,31 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                         </div>
                                         <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
                                             <span className="text-gray-400 uppercase text-[10px]">Kategori</span>
-                                            <span className="text-right capitalize text-foreground">{selectedStockDetail.category}</span>
+                                            <span className="text-right capitalize text-foreground">{selectedStockDetail.category === 'extra' ? 'Add-On / Jasa' : selectedStockDetail.category}</span>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
-                                            <span className="text-gray-400 uppercase text-[10px]">Spesifikasi</span>
-                                            <span className="text-right text-foreground">
-                                                {selectedStockDetail.memory?.value || '-'} / {selectedStockDetail.color?.value || '-'}
-                                            </span>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
-                                            <span className="text-gray-400 uppercase text-[10px]">Lisensi</span>
-                                            <span className="text-right text-foreground">{selectedStockDetail.license?.value || '-'}</span>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
-                                            <span className="text-gray-400 uppercase text-[10px]">Serial Number</span>
-                                            <span className="text-right font-mono text-foreground">{selectedStockDetail.serial_number || '-'}</span>
-                                        </div>
-                                        {selectedStockDetail.imei_1 && (
-                                            <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
-                                                <span className="text-gray-400 uppercase text-[10px]">IMEI</span>
-                                                <span className="text-right font-mono text-foreground">{selectedStockDetail.imei_1}</span>
-                                            </div>
+                                        {selectedStockDetail.category !== 'extra' && (
+                                            <>
+                                                <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
+                                                    <span className="text-gray-400 uppercase text-[10px]">Spesifikasi</span>
+                                                    <span className="text-right text-foreground">
+                                                        {selectedStockDetail.memory?.value || '-'} / {selectedStockDetail.color?.value || '-'}
+                                                    </span>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
+                                                    <span className="text-gray-400 uppercase text-[10px]">Lisensi</span>
+                                                    <span className="text-right text-foreground">{selectedStockDetail.license?.value || '-'}</span>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
+                                                    <span className="text-gray-400 uppercase text-[10px]">Serial Number</span>
+                                                    <span className="text-right font-mono text-foreground">{selectedStockDetail.serial_number || '-'}</span>
+                                                </div>
+                                                {selectedStockDetail.imei_1 && (
+                                                    <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
+                                                        <span className="text-gray-400 uppercase text-[10px]">IMEI</span>
+                                                        <span className="text-right font-mono text-foreground">{selectedStockDetail.imei_1}</span>
+                                                    </div>
+                                                )}
+                                            </>
                                         )}
                                         
                                         {isSuperAdmin && (
@@ -1444,6 +1513,46 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                         </div>
                                     </div>
                                 </div>
+
+                                {editForm.data.status === 'sold' && (
+                                    <div className="p-0 sm:p-4 rounded-none sm:rounded-xl border-0 sm:border border-transparent sm:border-border dark:sm:border-input bg-transparent sm:bg-muted/20 space-y-4">
+                                        <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">4. Informasi Pembeli / Pelanggan</h4>
+                                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                            <div>
+                                                <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Nama Pembeli</label>
+                                                <input
+                                                    type="text"
+                                                    required
+                                                    value={editForm.data.buyer_name || ''}
+                                                    onChange={e => editForm.setData('buyer_name', e.target.value)}
+                                                    className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
+                                                    placeholder="Nama Pembeli"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold uppercase text-gray-400 mb-1">No. HP / WA Pembeli</label>
+                                                <input
+                                                    type="text"
+                                                    required
+                                                    value={editForm.data.buyer_phone || ''}
+                                                    onChange={e => editForm.setData('buyer_phone', e.target.value)}
+                                                    className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
+                                                    placeholder="Contoh: 081234567890"
+                                                />
+                                            </div>
+                                            <div className="sm:col-span-2">
+                                                <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Alamat Pembeli</label>
+                                                <textarea
+                                                    value={editForm.data.buyer_address || ''}
+                                                    onChange={e => editForm.setData('buyer_address', e.target.value)}
+                                                    className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
+                                                    placeholder="Alamat Pembeli (Opsional)"
+                                                    rows={2}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div className="flex gap-3 pt-4 border-t border-border dark:border-input justify-end">
                                     <button type="button" onClick={() => setIsEditingStock(false)} className="rounded-xl border border-input px-6 py-3 text-xs font-semibold text-gray-500 hover:bg-muted dark:border-input">

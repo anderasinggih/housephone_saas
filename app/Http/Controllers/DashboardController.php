@@ -54,24 +54,41 @@ class DashboardController extends Controller
             });
         }
 
-        $sales = $salesQuery->with(['items.stock', 'extras'])->get();
+        $sales = $salesQuery->with(['items.stock', 'extras', 'returns'])->get();
         $returns = $returnsQuery->get();
         $repairs = $repairsQuery->get();
 
         // Financial Math for the active period
         $totalRevenue = 0;
         $totalHpp = 0;
+        $soldItemsCount = 0;
 
         foreach ($sales as $sale) {
-            $totalRevenue += $sale->total_amount;
+            $returnedStockIds = $sale->returns->pluck('stock_id')->toArray();
+            $saleRevenue = 0;
+            $saleHpp = 0;
+
             foreach ($sale->items as $item) {
-                $totalHpp += $item->buy_price_snap * $item->qty;
-            }
-            foreach ($sale->extras as $extra) {
-                if ($extra->charge_to === 'seller') {
-                    $totalHpp += $extra->buy_price;
+                if (in_array($item->stock_id, $returnedStockIds)) {
+                    continue;
+                }
+                $saleRevenue += $item->actual_sell_price * $item->qty;
+                if (!$item->is_trade_in_item) {
+                    $saleHpp += $item->buy_price_snap * $item->qty;
+                    $soldItemsCount += $item->qty;
                 }
             }
+
+            foreach ($sale->extras as $extra) {
+                if ($extra->charge_to === 'buyer') {
+                    $saleRevenue += $extra->sell_price;
+                } elseif ($extra->charge_to === 'seller') {
+                    $saleHpp += $extra->buy_price;
+                }
+            }
+
+            $totalRevenue += $saleRevenue;
+            $totalHpp += $saleHpp;
         }
 
         $totalRepairs = $repairs->sum('repair_cost');
@@ -100,20 +117,39 @@ class DashboardController extends Controller
         // --- All Time (Global) Statistics ---
         $allTimeSales = Sale::where('status', 'completed')
             ->when($storeId, fn($q) => $q->where('store_id', $storeId))
-            ->with(['items.stock', 'extras'])
+            ->with(['items.stock', 'extras', 'returns'])
             ->get();
             
-        $allTimeRevenue = $allTimeSales->sum('total_amount');
+        $allTimeRevenue = 0;
         $allTimeHpp = 0;
+        $allTimeSoldItems = 0;
+
         foreach ($allTimeSales as $sale) {
+            $returnedStockIds = $sale->returns->pluck('stock_id')->toArray();
+            $saleRevenue = 0;
+            $saleHpp = 0;
+
             foreach ($sale->items as $item) {
-                $allTimeHpp += $item->buy_price_snap * $item->qty;
-            }
-            foreach ($sale->extras as $extra) {
-                if ($extra->charge_to === 'seller') {
-                    $allTimeHpp += $extra->buy_price;
+                if (in_array($item->stock_id, $returnedStockIds)) {
+                    continue;
+                }
+                $saleRevenue += $item->actual_sell_price * $item->qty;
+                if (!$item->is_trade_in_item) {
+                    $saleHpp += $item->buy_price_snap * $item->qty;
+                    $allTimeSoldItems += $item->qty;
                 }
             }
+
+            foreach ($sale->extras as $extra) {
+                if ($extra->charge_to === 'buyer') {
+                    $saleRevenue += $extra->sell_price;
+                } elseif ($extra->charge_to === 'seller') {
+                    $saleHpp += $extra->buy_price;
+                }
+            }
+
+            $allTimeRevenue += $saleRevenue;
+            $allTimeHpp += $saleHpp;
         }
 
         $allTimeRepairsQuery = WarrantyRepair::where('status', 'repaired');
@@ -127,7 +163,6 @@ class DashboardController extends Controller
         $allTimeReturnPenalty = $allTimeReturnsQuery->sum('restocking_fee');
         $allTimeAffiliatorFee = $allTimeSales->sum('affiliate_fee');
         $allTimeNetProfit = $allTimeRevenue - $allTimeHpp - $allTimeRepairs + $allTimeReturnPenalty - $allTimeAffiliatorFee;
-        $allTimeSoldItems = $allTimeSales->flatMap(fn($s) => $s->items)->sum('qty');
 
         // --- Type / Phone model distribution (filtered by active period) ---
         $typeData = Sale::where('status', 'completed')
@@ -222,6 +257,7 @@ class DashboardController extends Controller
             ->join('stocks', 'sale_items.stock_id', '=', 'stocks.id')
             ->join('sales', 'sale_items.sale_id', '=', 'sales.id')
             ->select('stocks.name', DB::raw('SUM(sale_items.qty) as total_sold'))
+            ->where('sales.status', 'completed')
             ->whereMonth('sales.created_at', $month)
             ->whereYear('sales.created_at', $year)
             ->when($storeId, fn($q) => $q->where('stocks.store_id', $storeId))
@@ -246,7 +282,7 @@ class DashboardController extends Controller
                 'totalReturnPenalty' => $user->role === 'karyawan' ? 0 : (float)$totalReturnPenalty,
                 'netProfit' => $user->role === 'karyawan' ? 0 : (float)$netProfit,
                 'totalAffiliatorFee' => $user->role === 'karyawan' ? 0 : (float)$sales->sum('affiliate_fee'),
-                'soldItemsCount' => (int)$sales->flatMap(fn($s) => $s->items)->sum('qty'),
+                'soldItemsCount' => (int)$soldItemsCount,
                 'pendingProfit' => $user->role === 'karyawan' ? 0 : (float)$pendingProfit,
                 'activeAffiliatorsCount' => $user->role === 'karyawan' ? 0 : (int)$activeAffiliatorsCount,
             ],

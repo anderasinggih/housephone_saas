@@ -390,7 +390,7 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                 <option value="iphone">iPhone</option>
                                 <option value="android">Android</option>
                                 <option value="accessories">Accessories</option>
-                                <option value="extra">Extra / Jasa</option>
+                                <option value="extra">Add-On / Jasa</option>
                             </select>
 
                             {/* Store Filter (superadmin only) */}
@@ -580,32 +580,36 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                 <div className="space-y-4 text-xs font-semibold text-gray-600 dark:text-gray-300">
                                     <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
                                         <span className="text-gray-400 uppercase text-[10px]">Kategori</span>
-                                        <span className="text-right capitalize text-foreground">{selectedStockDetail.category}</span>
+                                        <span className="text-right capitalize text-foreground">{selectedStockDetail.category === 'extra' ? 'Add-On / Jasa' : selectedStockDetail.category}</span>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
-                                        <span className="text-gray-400 uppercase text-[10px]">Merek</span>
-                                        <span className="text-right text-foreground">{selectedStockDetail.brand?.value || '-'}</span>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
-                                        <span className="text-gray-400 uppercase text-[10px]">Warna</span>
-                                        <span className="text-right text-foreground">{selectedStockDetail.color?.value || '-'}</span>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
-                                        <span className="text-gray-400 uppercase text-[10px]">Memori</span>
-                                        <span className="text-right text-foreground">{selectedStockDetail.memory?.value || '-'}</span>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
-                                        <span className="text-gray-400 uppercase text-[10px]">Lisensi / Sinyal</span>
-                                        <span className="text-right text-foreground">{selectedStockDetail.license?.value || '-'}</span>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
-                                        <span className="text-gray-400 uppercase text-[10px]">Serial Number</span>
-                                        <span className="text-right font-mono text-foreground">{selectedStockDetail.serial_number || '-'}</span>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
-                                        <span className="text-gray-400 uppercase text-[10px]">IMEI</span>
-                                        <span className="text-right font-mono text-foreground">{selectedStockDetail.imei_1 || '-'}</span>
-                                    </div>
+                                    {selectedStockDetail.category !== 'extra' && (
+                                        <>
+                                            <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
+                                                <span className="text-gray-400 uppercase text-[10px]">Merek</span>
+                                                <span className="text-right text-foreground">{selectedStockDetail.brand?.value || '-'}</span>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
+                                                <span className="text-gray-400 uppercase text-[10px]">Warna</span>
+                                                <span className="text-right text-foreground">{selectedStockDetail.color?.value || '-'}</span>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
+                                                <span className="text-gray-400 uppercase text-[10px]">Memori</span>
+                                                <span className="text-right text-foreground">{selectedStockDetail.memory?.value || '-'}</span>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
+                                                <span className="text-gray-400 uppercase text-[10px]">Lisensi / Sinyal</span>
+                                                <span className="text-right text-foreground">{selectedStockDetail.license?.value || '-'}</span>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
+                                                <span className="text-gray-400 uppercase text-[10px]">Serial Number</span>
+                                                <span className="text-right font-mono text-foreground">{selectedStockDetail.serial_number || '-'}</span>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
+                                                <span className="text-gray-400 uppercase text-[10px]">IMEI</span>
+                                                <span className="text-right font-mono text-foreground">{selectedStockDetail.imei_1 || '-'}</span>
+                                            </div>
+                                        </>
+                                    )}
                                     <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
                                         <span className="text-gray-400 uppercase text-[10px]">Harga Jual</span>
                                         <span className="text-right font-bold text-indigo-600 dark:text-indigo-400">

@@ -75,14 +75,21 @@ export default function Authenticated({
     };
 
     const checkedInToday = (usePage().props.auth as any).checkedInToday;
-    const isKaryawanNotCheckedIn = user.role === 'karyawan' && !checkedInToday;
+    const isKaryawan = user.role === 'karyawan';
+    const isKaryawanNotCheckedIn = isKaryawan && !checkedInToday;
 
     // Dynamic Navigation link classes using Shadcn UI theme variables
     const getLinkClass = (isActive: boolean) => {
-        if (isKaryawanNotCheckedIn) {
-            return isActive 
-                ? "p-2.5 rounded-full bg-white/20 border border-white/40 text-white font-bold shadow-sm transition-all duration-200" 
-                : "p-2.5 rounded-full text-white/80 border border-transparent hover:bg-white/10 hover:text-white transition-all duration-200";
+        if (isKaryawan) {
+            if (!checkedInToday) {
+                return isActive 
+                    ? "p-2.5 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-600 dark:text-rose-400 font-bold shadow-sm transition-all duration-200" 
+                    : "p-2.5 rounded-full text-rose-500/70 border border-transparent hover:bg-rose-500/10 hover:text-rose-600 transition-all duration-200";
+            } else {
+                return isActive 
+                    ? "p-2.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 font-bold shadow-sm transition-all duration-200" 
+                    : "p-2.5 rounded-full text-emerald-500/70 border border-transparent hover:bg-emerald-500/10 hover:text-emerald-600 transition-all duration-200";
+            }
         }
         return isActive 
             ? "p-2.5 rounded-full bg-primary/10 border border-primary/30 text-primary font-bold shadow-sm transition-all duration-200" 
@@ -124,8 +131,10 @@ export default function Authenticated({
         <div className="min-h-screen bg-background text-foreground transition-colors duration-300 font-sans">
             {/* Top Navbar: Hidden on mobile, visible on desktop with Liquid Glass design */}
             <nav className={`hidden sm:block border-b sticky top-0 z-50 transition-all duration-300 ${
-                isKaryawanNotCheckedIn 
-                    ? 'bg-rose-600 border-rose-700 text-white' 
+                isKaryawan 
+                    ? !checkedInToday
+                        ? 'bg-rose-500/10 dark:bg-rose-950/20 border-rose-500/20 text-rose-600 dark:text-rose-400 backdrop-blur-xl shadow-sm'
+                        : 'bg-emerald-500/10 dark:bg-emerald-950/20 border-emerald-500/20 text-emerald-600 dark:text-emerald-400 backdrop-blur-xl shadow-sm'
                     : 'border-white/20 dark:border-white/5 bg-background/60 backdrop-blur-xl shadow-[0_8px_32px_0_rgba(0,0,0,0.04)]'
             }`}>
                 <div className="mx-auto max-w-none px-4 sm:px-6 lg:px-8">
@@ -133,7 +142,13 @@ export default function Authenticated({
                         <div className="flex items-center gap-6">
                             <div className="flex shrink-0 items-center">
                                 <Link href="/">
-                                    <ApplicationLogo className={`block h-9 w-auto fill-current ${isKaryawanNotCheckedIn ? 'text-white' : 'text-primary'}`} />
+                                    <ApplicationLogo className={`block h-9 w-auto fill-current ${
+                                        isKaryawan 
+                                            ? !checkedInToday 
+                                                ? 'text-rose-600 dark:text-rose-400' 
+                                                : 'text-emerald-600 dark:text-emerald-400' 
+                                            : 'text-primary'
+                                    }`} />
                                 </Link>
                             </div>
 
@@ -305,8 +320,10 @@ export default function Authenticated({
 
             {/* Mobile Floating Bottom Navbar: Slim, Liquid Glass, & Rounded-full */}
             <div className={`sm:hidden fixed bottom-5 left-1/2 -translate-x-1/2 z-50 h-16 rounded-full border shadow-[0_8px_32px_0_rgba(0,0,0,0.08)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.3)] flex items-center justify-between px-3 py-1 w-[94%] max-w-md transition-all duration-300 ${
-                isKaryawanNotCheckedIn 
-                    ? 'bg-rose-600 border-rose-700 text-white' 
+                isKaryawan 
+                    ? !checkedInToday
+                        ? 'bg-rose-500/10 dark:bg-rose-950/20 border-rose-500/20 text-rose-600 dark:text-rose-400 backdrop-blur-xl'
+                        : 'bg-emerald-500/10 dark:bg-emerald-950/20 border-emerald-500/20 text-emerald-600 dark:text-emerald-400 backdrop-blur-xl'
                     : 'bg-background/60 backdrop-blur-xl border-white/20 dark:border-white/10'
             }`}>
                 {mobileTabs.map((tab) => {
