@@ -117,7 +117,7 @@ class SaleController extends Controller
             return redirect()->back()->withErrors(['error' => 'Anda harus membuka shift kasir terlebih dahulu sebelum bertransaksi.']);
         }
 
-        DB::transaction(function () use ($request, $user, $storeId, $activeShift) {
+        $sale = DB::transaction(function () use ($request, $user, $storeId, $activeShift) {
             // Find or create buyer
             $buyer = Buyer::firstOrCreate(
                 ['phone' => $request->input('buyer_phone')],
@@ -257,6 +257,8 @@ class SaleController extends Controller
                 'buyer_name' => $buyer->name,
                 'items_detail' => implode(', ', $itemsNames)
             ]);
+
+            return $sale;
         });
 
         return redirect()->back()->with([
