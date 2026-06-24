@@ -574,7 +574,7 @@ export default function Dashboard({
                     </div>
 
                     {/* Stat Grid for the Selected Period */}
-                    <div className={`grid grid-cols-2 gap-3 ${isKaryawan ? 'max-w-2xl' : 'md:grid-cols-4'}`}>
+                    <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 ${isKaryawan ? 'max-w-2xl' : 'md:grid-cols-4'}`}>
                         <StatCard 
                             title={`Omset (${getMonthName(filters.month)} ${filters.year})`} 
                             value={stats.totalRevenue} 
