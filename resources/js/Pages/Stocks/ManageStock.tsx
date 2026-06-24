@@ -555,12 +555,18 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                 <tr>
                                                     <td colSpan={isSuperAdmin ? 19 : 15} className="py-8 text-center text-gray-400">Belum ada data unit dalam sistem.</td>
                                                 </tr>
-                                            ) : (
-                                                [...sortedStocks].sort((a, b) => {
+                                            ) : (() => {
+                                                // Sort: available/transit first, sold second, trash last
+                                                const displayItems = [...sortedStocks].sort((a, b) => {
                                                     const order = { 'available': 1, 'transit': 2, 'sold': 3 };
-                                                    return (order[a.status as keyof typeof order] || 4) - (order[b.status as keyof typeof order] || 4);
-                                                }).map((item, idx) => {
-                                                    const prevItem = idx > 0 ? sortedStocks[idx - 1] : null;
+                                                    const aOrder = a.deleted_at ? 4 : (order[a.status as keyof typeof order] || 4);
+                                                    const bOrder = b.deleted_at ? 4 : (order[b.status as keyof typeof order] || 4);
+                                                    return aOrder - bOrder;
+                                                });
+                                                return displayItems.map((item, idx) => {
+                                                    const prevItem = idx > 0 ? displayItems[idx - 1] : null;
+                                                    const isFirstItem = idx === 0;
+                                                    const showAvailableHeader = isFirstItem && !item.deleted_at && item.status !== 'sold';
                                                     const showSoldDivider = prevItem && (prevItem.status !== 'sold' && !prevItem.deleted_at) && (item.status === 'sold' && !item.deleted_at);
                                                     const showTrashDivider = prevItem && !prevItem.deleted_at && item.deleted_at;
 
@@ -588,6 +594,19 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
  
                                                     return (
                                                         <Fragment key={item.id}>
+                                                            {showAvailableHeader && (
+                                                                <tr className="bg-emerald-500/5 dark:bg-emerald-950/10 select-none">
+                                                                    <td colSpan={isSuperAdmin ? 19 : 15} className="py-2.5 px-3 border-b border-emerald-100 dark:border-emerald-950/40 text-center">
+                                                                        <div className="flex items-center justify-center gap-2">
+                                                                            <div className="h-px bg-emerald-200 dark:bg-emerald-950 flex-1" />
+                                                                            <span className="text-[10px] font-black tracking-wider uppercase text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded border border-emerald-500/20">
+                                                                                ✓ UNIT TERSEDIA (AVAILABLE)
+                                                                            </span>
+                                                                            <div className="h-px bg-emerald-200 dark:bg-emerald-950 flex-1" />
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            )}
                                                             {showSoldDivider && (
                                                                 <tr className="bg-rose-500/5 dark:bg-rose-950/10 select-none">
                                                                     <td colSpan={isSuperAdmin ? 19 : 15} className="py-2.5 px-3 border-y border-rose-100 dark:border-rose-950/40 text-center">
@@ -676,8 +695,8 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                             </tr>
                                                         </Fragment>
                                                     );
-                                                })
-                                            )}
+                                                });
+                                            })()}
                                         </tbody>
                                     </table>
                                 </div>
