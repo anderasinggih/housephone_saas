@@ -114,7 +114,7 @@ class StockController extends Controller
         }
 
         $validated = $request->validate([
-            'store_id' => 'required|exists:stores,id',
+            'store_id' => 'required|string',
             'category' => 'required|in:iphone,android,accessories,extra',
             'type' => 'required|in:new,second',
             'name' => 'required|string',
@@ -135,10 +135,23 @@ class StockController extends Controller
         // Remove grade/imei_2 if passed from old form
         unset($validated['grade'], $validated['imei_2']);
 
-        $stock = Stock::create($validated);
-        ActivityLog::log('add_stock', Stock::class, $stock->id, $stock->toArray());
-
-        return redirect()->back()->with('success', 'Stok berhasil ditambahkan.');
+        if ($validated['store_id'] === 'all') {
+            $stores = Store::all();
+            DB::transaction(function() use ($validated, $stores) {
+                foreach ($stores as $store) {
+                    $data = $validated;
+                    $data['store_id'] = $store->id;
+                    $stock = Stock::create($data);
+                    ActivityLog::log('add_stock', Stock::class, $stock->id, $stock->toArray());
+                }
+            });
+            return redirect()->back()->with('success', 'Stok berhasil ditambahkan untuk semua cabang.');
+        } else {
+            $request->validate(['store_id' => 'exists:stores,id']);
+            $stock = Stock::create($validated);
+            ActivityLog::log('add_stock', Stock::class, $stock->id, $stock->toArray());
+            return redirect()->back()->with('success', 'Stok berhasil ditambahkan.');
+        }
     }
 
     public function storeBatch(Request $request): RedirectResponse

@@ -853,6 +853,9 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                 onChange={e => singleForm.setData('store_id', e.target.value)}
                                                 className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
                                             >
+                                                {singleForm.data.category === 'extra' && (
+                                                    <option value="all">Semua Cabang</option>
+                                                )}
                                                 {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                                             </select>
                                         </div>
@@ -860,7 +863,14 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                             <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Kategori Barang</label>
                                             <select
                                                 value={singleForm.data.category}
-                                                onChange={e => singleForm.setData('category', e.target.value as any)}
+                                                onChange={e => {
+                                                    const cat = e.target.value as any;
+                                                    singleForm.setData(data => ({
+                                                        ...data,
+                                                        category: cat,
+                                                        store_id: (cat !== 'extra' && data.store_id === 'all') ? (stores[0]?.id || '') : data.store_id
+                                                    }));
+                                                }}
                                                 className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
                                             >
                                                 <option value="iphone">iPhone</option>
@@ -869,17 +879,19 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                 <option value="extra">Jasa / Add-on (Layanan)</option>
                                             </select>
                                         </div>
-                                        <div>
-                                            <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Kondisi Barang</label>
-                                            <select
-                                                value={singleForm.data.type}
-                                                onChange={e => singleForm.setData('type', e.target.value as any)}
-                                                className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
-                                            >
-                                                <option value="new">Baru (New)</option>
-                                                <option value="second">Bekas (Second)</option>
-                                            </select>
-                                        </div>
+                                        {singleForm.data.category !== 'extra' && (
+                                            <div>
+                                                <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Kondisi Barang</label>
+                                                <select
+                                                    value={singleForm.data.type}
+                                                    onChange={e => singleForm.setData('type', e.target.value as any)}
+                                                    className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
+                                                >
+                                                    <option value="new">Baru (New)</option>
+                                                    <option value="second">Bekas (Second)</option>
+                                                </select>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
@@ -965,9 +977,9 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                 </div>
                                             </>
                                         )}
-
+ 
                                         {/* Accessories Color selection */}
-                                        {(singleForm.data.category === 'accessories' || singleForm.data.category === 'extra') && (
+                                        {singleForm.data.category === 'accessories' && (
                                             <div>
                                                 <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Warna (Opsional)</label>
                                                 <select
@@ -982,7 +994,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                         )}
                                     </div>
                                 </div>
-
+ 
                                 {/* Section 3: Harga & Finansial */}
                                 <div className="p-0 sm:p-4 rounded-none sm:rounded-xl border-0 sm:border border-transparent sm:border-border dark:sm:border-input bg-transparent sm:bg-muted/20 space-y-4">
                                     <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">3. Finansial, Garansi & Distribusi</h4>
@@ -1008,9 +1020,9 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                 className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
                                             />
                                         </div>
-                                        {singleForm.data.category === 'accessories' && (
+                                        {(singleForm.data.category === 'accessories' || singleForm.data.category === 'extra') && (
                                             <div>
-                                                <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Quantity (Stok Bulk)</label>
+                                                <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Quantity (Stok)</label>
                                                 <input
                                                     type="number"
                                                     required
