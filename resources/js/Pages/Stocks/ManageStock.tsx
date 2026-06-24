@@ -131,6 +131,8 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
         switch (key) {
             case 'created_at':
                 return item.created_at ? new Date(item.created_at).getTime() : 0;
+            case 'name':
+                return item.name || '';
             case 'sold_date':
                 return (item.status === 'sold' && sale?.created_at) ? new Date(sale.created_at).getTime() : 0;
             case 'store':
@@ -446,6 +448,9 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                 <th onClick={() => requestSort('created_at')} className="pb-3 font-semibold px-3 whitespace-nowrap text-left cursor-pointer hover:text-foreground">
                                                     Stock Date {sortConfig.key === 'created_at' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
                                                 </th>
+                                                <th onClick={() => requestSort('name')} className="pb-3 font-semibold px-3 whitespace-nowrap text-left cursor-pointer hover:text-foreground">
+                                                    Product Name {sortConfig.key === 'name' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                                </th>
                                                 <th onClick={() => requestSort('sold_date')} className="pb-3 font-semibold px-3 whitespace-nowrap text-left cursor-pointer hover:text-foreground">
                                                     Sold Date {sortConfig.key === 'sold_date' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
                                                 </th>
@@ -510,7 +515,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                         <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-xs font-semibold text-gray-700 dark:text-gray-300">
                                             {sortedStocks.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan={isSuperAdmin ? 18 : 14} className="py-8 text-center text-gray-400">Belum ada data unit dalam sistem.</td>
+                                                    <td colSpan={isSuperAdmin ? 19 : 15} className="py-8 text-center text-gray-400">Belum ada data unit dalam sistem.</td>
                                                 </tr>
                                             ) : (
                                                 sortedStocks.map((item) => {
@@ -545,6 +550,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                             }`}
                                                         >
                                                             <td className="py-4 px-3 font-medium whitespace-nowrap text-left">{stockDate}</td>
+                                                            <td className="py-4 px-3 font-bold text-xs whitespace-nowrap text-left">{item.name}</td>
                                                             <td className="py-4 px-3 font-medium whitespace-nowrap text-left">{soldDate}</td>
                                                             <td className="py-4 px-3 font-bold text-xs whitespace-nowrap text-left">{stockFor}</td>
                                                             <td className="py-4 px-3 uppercase text-[10px] font-bold text-indigo-500 whitespace-nowrap text-left">{typeText}</td>
@@ -868,7 +874,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                     singleForm.setData(data => ({
                                                         ...data,
                                                         category: cat,
-                                                        store_id: (cat !== 'extra' && data.store_id === 'all') ? (stores[0]?.id || '') : data.store_id
+                                                        store_id: cat === 'extra' ? 'all' : ((data.store_id === 'all') ? (stores[0]?.id || '') : data.store_id)
                                                     }));
                                                 }}
                                                 className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
@@ -1096,6 +1102,9 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                 onChange={e => editForm.setData('store_id', e.target.value)}
                                                 className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
                                             >
+                                                {editForm.data.category === 'extra' && (
+                                                    <option value="all">Semua Cabang</option>
+                                                )}
                                                 {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                                             </select>
                                         </div>
@@ -1103,7 +1112,14 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                             <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Kategori Barang</label>
                                             <select
                                                 value={editForm.data.category}
-                                                onChange={e => editForm.setData('category', e.target.value as any)}
+                                                onChange={e => {
+                                                    const cat = e.target.value as any;
+                                                    editForm.setData(data => ({
+                                                        ...data,
+                                                        category: cat,
+                                                        store_id: cat === 'extra' ? 'all' : ((data.store_id === 'all') ? (stores[0]?.id || '') : data.store_id)
+                                                    }));
+                                                }}
                                                 className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
                                             >
                                                 <option value="iphone">iPhone</option>
@@ -1112,17 +1128,19 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                 <option value="extra">Jasa / Add-on (Layanan)</option>
                                             </select>
                                         </div>
-                                        <div>
-                                            <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Kondisi Barang</label>
-                                            <select
-                                                value={editForm.data.type}
-                                                onChange={e => editForm.setData('type', e.target.value as any)}
-                                                className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
-                                            >
-                                                <option value="new">Baru (New)</option>
-                                                <option value="second">Bekas (Second)</option>
-                                            </select>
-                                        </div>
+                                        {editForm.data.category !== 'extra' && (
+                                            <div>
+                                                <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Kondisi Barang</label>
+                                                <select
+                                                    value={editForm.data.type}
+                                                    onChange={e => editForm.setData('type', e.target.value as any)}
+                                                    className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
+                                                >
+                                                    <option value="new">Baru (New)</option>
+                                                    <option value="second">Bekas (Second)</option>
+                                                </select>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
@@ -1193,7 +1211,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                             </>
                                         )}
 
-                                        {(editForm.data.category === 'accessories' || editForm.data.category === 'extra') && (
+                                        {editForm.data.category === 'accessories' && (
                                             <div>
                                                 <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Warna (Opsional)</label>
                                                 <select
@@ -1233,7 +1251,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                 className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold dark:border-input dark:bg-background"
                                             />
                                         </div>
-                                        {editForm.data.category === 'accessories' && (
+                                        {(editForm.data.category === 'accessories' || editForm.data.category === 'extra') && (
                                             <div>
                                                 <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Quantity (Stok)</label>
                                                 <input

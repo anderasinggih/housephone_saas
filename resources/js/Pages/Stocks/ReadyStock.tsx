@@ -692,10 +692,12 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                             <button onClick={() => setIsCheckoutOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1.5 hover:bg-muted rounded-lg text-lg transition-colors">✕</button>
                         </div>
 
-                        {/* Global Error */}
-                        {(checkoutForm.errors as any).error && (
-                            <div className="mt-3 rounded-lg bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900 p-3 text-xs font-bold text-rose-600 dark:text-rose-400">
-                                {(checkoutForm.errors as any).error}
+                        {/* Global/Validation Errors List */}
+                        {Object.keys(checkoutForm.errors).length > 0 && (
+                            <div className="mt-3 rounded-lg bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900 p-3 text-xs font-bold text-rose-600 dark:text-rose-400 space-y-1">
+                                {Object.entries(checkoutForm.errors).map(([key, err]) => (
+                                    <div key={key}>• {err}</div>
+                                ))}
                             </div>
                         )}
 

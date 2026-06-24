@@ -40,6 +40,11 @@ class HandleInertiaRequests extends Middleware
                         ->exists()
                     : false,
             ],
+            'flash' => [
+                'success' => $request->session()->get('success'),
+                'error' => $request->session()->get('error'),
+                'invoice_number' => $request->session()->get('invoice_number'),
+            ],
             'ziggy' => fn () => [
                 ...(new Ziggy)->toArray(),
                 'location' => $request->url(),

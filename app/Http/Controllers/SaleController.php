@@ -69,7 +69,7 @@ class SaleController extends Controller
             'buyer_address' => 'nullable|string',
             'payment_method' => 'required|in:cash,online',
             'payment_detail' => 'nullable|string',
-            'dp_amount' => 'required|numeric|min:0',
+            'dp_amount' => 'nullable|numeric|min:0',
             'status' => 'required|in:booking,completed',
             'affiliate_user_id' => 'nullable|exists:users,id',
             'affiliate_fee' => 'nullable|numeric|min:0',
@@ -211,7 +211,7 @@ class SaleController extends Controller
                 'payment_method' => $request->input('payment_method'),
                 'payment_detail' => $request->input('payment_detail'),
                 'total_amount' => $finalTotal,
-                'dp_amount' => $request->input('dp_amount'),
+                'dp_amount' => $request->input('dp_amount') ?? 0,
                 'status' => $request->input('status'),
                 'affiliate_user_id' => $request->input('affiliate_user_id'),
                 'affiliate_fee' => $request->input('affiliate_fee') ?? 0,
@@ -259,7 +259,10 @@ class SaleController extends Controller
             ]);
         });
 
-        return redirect()->back()->with('success', 'Transaksi berhasil diselesaikan.');
+        return redirect()->back()->with([
+            'success' => 'Transaksi berhasil diselesaikan.',
+            'invoice_number' => $sale->invoice_number,
+        ]);
     }
 
     public function void(Request $request, $id): RedirectResponse
