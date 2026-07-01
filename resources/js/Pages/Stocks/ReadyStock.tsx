@@ -450,10 +450,13 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                                     <div className="flex justify-between items-start gap-3">
                                                         <div className="min-w-0 flex-1">
                                                             <p className="font-semibold text-foreground truncate block text-sm" title={item.name}>
-                                                                {item.name}
+                                                                {item.name} {item.color?.value ? `${item.color.value}` : ''} {item.memory?.value ? `/ ${item.memory.value}` : ''}
                                                             </p>
                                                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-0.5 truncate">
-                                                                {item.category} {item.brand?.value ? `• ${item.brand.value}` : ''} {item.memory?.value ? `• ${item.memory.value}` : ''}
+                                                                {item.category !== 'accessories' && item.category !== 'extra'
+                                                                    ? `${item.serial_number || item.imei_1 || '-'} (${item.license?.value || item.supplier || 'N/A'})`
+                                                                    : `${item.category} • ${item.brand?.value || '-'}`
+                                                                }
                                                             </p>
                                                         </div>
                                                         <div className="text-right flex-shrink-0">
@@ -502,10 +505,13 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                                         >
                                                             <td className="py-2.5 px-4 text-left">
                                                                 <p className="font-semibold text-foreground truncate block max-w-xs" title={item.name}>
-                                                                    {item.name}
+                                                                    {item.name} {item.color?.value ? `${item.color.value}` : ''} {item.memory?.value ? `/ ${item.memory.value}` : ''}
                                                                 </p>
                                                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-0.5 truncate max-w-xs">
-                                                                    {item.category} {item.brand?.value ? `• ${item.brand.value}` : ''} {item.memory?.value ? `• ${item.memory.value}` : ''}
+                                                                    {item.category !== 'accessories' && item.category !== 'extra'
+                                                                        ? `${item.serial_number || item.imei_1 || '-'} (${item.license?.value || item.supplier || 'N/A'})`
+                                                                        : `${item.category} • ${item.brand?.value || '-'}`
+                                                                    }
                                                                 </p>
                                                             </td>
                                                             <td className="py-2.5 px-4 font-bold text-indigo-600 dark:text-indigo-400 whitespace-nowrap text-left">
@@ -554,7 +560,9 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                         <span className="mx-1.5 flex-shrink-0">/</span>
                                         <span className="hover:text-foreground cursor-pointer whitespace-nowrap" onClick={() => setSelectedStockDetail(null)}>Detail</span>
                                         <span className="mx-1.5 flex-shrink-0">/</span>
-                                        <span className="text-indigo-600 dark:text-indigo-400 truncate max-w-[120px]" title={selectedStockDetail.name}>{selectedStockDetail.name}</span>
+                                        <span className="text-indigo-600 dark:text-indigo-400 truncate max-w-[120px]" title={selectedStockDetail.name}>
+                                            {selectedStockDetail.name} {selectedStockDetail.color?.value ? `${selectedStockDetail.color.value}` : ''} {selectedStockDetail.memory?.value ? `/ ${selectedStockDetail.memory.value}` : ''}
+                                        </span>
                                     </nav>
                                     <button 
                                         onClick={() => setSelectedStockDetail(null)}
@@ -566,7 +574,9 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
 
                                 {/* Content Info */}
                                 <div>
-                                    <h4 className="text-sm font-bold text-foreground">{selectedStockDetail.name}</h4>
+                                    <h4 className="text-sm font-bold text-foreground">
+                                        {selectedStockDetail.name} {selectedStockDetail.color?.value ? `${selectedStockDetail.color.value}` : ''} {selectedStockDetail.memory?.value ? `/ ${selectedStockDetail.memory.value}` : ''}
+                                    </h4>
                                     <div className="flex gap-2 mt-2">
                                         <span className="inline-flex rounded px-2 py-0.5 text-[10px] font-bold uppercase bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
                                             {selectedStockDetail.type}
@@ -694,7 +704,7 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                         <div className="flex justify-between items-center pb-4 border-b border-border dark:border-input">
                             <div>
                                 <h4 className="text-xl font-semibold text-foreground">Formulir Checkout Kasir</h4>
-                                <p className="text-xs text-gray-400">Unit: {selectedStock.name}</p>
+                                <p className="text-xs text-gray-400">Unit: {selectedStock.name} {selectedStock.color?.value ? `${selectedStock.color.value}` : ''} {selectedStock.memory?.value ? `/ ${selectedStock.memory.value}` : ''} ({selectedStock.serial_number || selectedStock.imei_1 || '-'})</p>
                             </div>
                             <button onClick={() => setIsCheckoutOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1.5 hover:bg-muted rounded-lg text-lg transition-colors">✕</button>
                         </div>

@@ -80,30 +80,34 @@ export default function Authenticated({
 
     // Dynamic Navigation link classes using Shadcn UI theme variables
     const getLinkClass = (isActive: boolean) => {
+        const base = "px-3 py-1.5 rounded-xl border border-transparent text-xs font-bold transition-all duration-200 flex items-center gap-1.5 ";
         if (isKaryawan) {
             if (!checkedInToday) {
-                return isActive 
-                    ? "p-2.5 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-600 dark:text-rose-400 font-bold shadow-sm transition-all duration-200" 
-                    : "p-2.5 rounded-full text-rose-500/70 border border-transparent hover:bg-rose-500/10 hover:text-rose-600 transition-all duration-200";
+                return base + (isActive 
+                    ? "bg-rose-500/20 border-rose-500/40 text-rose-600 dark:text-rose-400 shadow-sm" 
+                    : "text-rose-500/70 hover:bg-rose-500/10 hover:text-rose-600");
             } else {
-                return isActive 
-                    ? "p-2.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 font-bold shadow-sm transition-all duration-200" 
-                    : "p-2.5 rounded-full text-emerald-500/70 border border-transparent hover:bg-emerald-500/10 hover:text-emerald-600 transition-all duration-200";
+                return base + (isActive 
+                    ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 shadow-sm" 
+                    : "text-emerald-500/70 hover:bg-emerald-500/10 hover:text-emerald-600");
             }
         }
-        return isActive 
-            ? "p-2.5 rounded-full bg-primary/10 border border-primary/30 text-primary font-bold shadow-sm transition-all duration-200" 
-            : "p-2.5 rounded-full text-muted-foreground border border-transparent hover:bg-foreground/10 hover:text-foreground hover:border-foreground/20 transition-all duration-200";
+        return base + (isActive 
+            ? "bg-primary/10 border-primary/30 text-primary shadow-sm" 
+            : "text-muted-foreground hover:bg-foreground/10 hover:text-foreground hover:border-foreground/20");
     };
 
     // Dynamically build bottom navbar tabs based on role
     const getMobileTabs = () => {
-        return [
+        const tabs = [
             { name: 'Selling', href: route('selling.index'), icon: Smartphone, current: route().current('selling.index') },
             { name: 'Dashboard', href: route('dashboard'), icon: LayoutDashboard, current: route().current('dashboard') },
-            { name: 'Sale Data', href: route('sale-data.index'), icon: Layers, current: route().current('sale-data.index') },
-            { name: 'Activities', href: route('timeline.index'), icon: Activity, current: route().current('timeline.index') },
         ];
+        if (user.role !== 'karyawan') {
+            tabs.push({ name: 'Sale Data', href: route('sale-data.index'), icon: Layers, current: route().current('sale-data.index') });
+        }
+        tabs.push({ name: 'Activities', href: route('timeline.index'), icon: Activity, current: route().current('timeline.index') });
+        return tabs;
     };
 
     const getMoreMenuItems = () => {
@@ -160,8 +164,8 @@ export default function Authenticated({
                                         className={getLinkClass(route().current('dashboard'))}
                                         title="Dashboard"
                                     >
-                                        <LayoutDashboard className="h-5 w-5" />
-                                        <span className="sr-only">Dashboard</span>
+                                        <LayoutDashboard className="h-4 w-4" />
+                                        <span>Dashboard</span>
                                     </Link>
                                 )}
                                 
@@ -170,26 +174,28 @@ export default function Authenticated({
                                     className={getLinkClass(route().current('selling.index'))}
                                     title="Selling"
                                 >
-                                    <Smartphone className="h-5 w-5" />
-                                    <span className="sr-only">Selling</span>
+                                    <Smartphone className="h-4 w-4" />
+                                    <span>Selling</span>
                                 </Link>
 
-                                <Link
-                                    href={route('sale-data.index')}
-                                    className={getLinkClass(route().current('sale-data.index'))}
-                                    title="Sale Data"
-                                >
-                                    <Layers className="h-5 w-5" />
-                                    <span className="sr-only">Sale Data</span>
-                                </Link>
+                                {user.role !== 'karyawan' && (
+                                    <Link
+                                        href={route('sale-data.index')}
+                                        className={getLinkClass(route().current('sale-data.index'))}
+                                        title="Sale Data"
+                                    >
+                                        <Layers className="h-4 w-4" />
+                                        <span>Sale Data</span>
+                                    </Link>
+                                )}
 
                                 <Link
                                     href={route('timeline.index')}
                                     className={getLinkClass(route().current('timeline.index'))}
                                     title="Activities"
                                 >
-                                    <Activity className="h-5 w-5" />
-                                    <span className="sr-only">Activities</span>
+                                    <Activity className="h-4 w-4" />
+                                    <span>Activities</span>
                                 </Link>
 
                                 {user.role === 'superadmin' && (
@@ -198,8 +204,8 @@ export default function Authenticated({
                                         className={getLinkClass(route().current('stores.index'))}
                                         title="Stores"
                                     >
-                                        <Store className="h-5 w-5" />
-                                        <span className="sr-only">Stores</span>
+                                        <Store className="h-4 w-4" />
+                                        <span>Stores</span>
                                     </Link>
                                 )}
 
@@ -208,8 +214,8 @@ export default function Authenticated({
                                     className={getLinkClass(route().current('sales-history.index'))}
                                     title="History"
                                 >
-                                    <History className="h-5 w-5" />
-                                    <span className="sr-only">History</span>
+                                    <History className="h-4 w-4" />
+                                    <span>History</span>
                                 </Link>
 
                                 <Link
@@ -217,8 +223,8 @@ export default function Authenticated({
                                     className={getLinkClass(route().current('customers.index'))}
                                     title="Customers"
                                 >
-                                    <Users className="h-5 w-5" />
-                                    <span className="sr-only">Customers</span>
+                                    <Users className="h-4 w-4" />
+                                    <span>Customers</span>
                                 </Link>
 
                                 <Link
@@ -226,8 +232,8 @@ export default function Authenticated({
                                     className={getLinkClass(route().current('shifts.index'))}
                                     title="Shifts"
                                 >
-                                    <Clock className="h-5 w-5" />
-                                    <span className="sr-only">Shifts</span>
+                                    <Clock className="h-4 w-4" />
+                                    <span>Shifts</span>
                                 </Link>
                             </div>
                         </div>

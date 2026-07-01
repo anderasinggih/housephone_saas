@@ -72,8 +72,8 @@ class DashboardController extends Controller
                 if (in_array($item->stock_id, $returnedStockIds)) {
                     continue;
                 }
-                $saleRevenue += $item->actual_sell_price * $item->qty;
                 if (!$item->is_trade_in_item) {
+                    $saleRevenue += $item->actual_sell_price * $item->qty;
                     $saleHpp += $item->buy_price_snap * $item->qty;
                     $soldItemsCount += $item->qty;
                 }
@@ -133,8 +133,8 @@ class DashboardController extends Controller
                 if (in_array($item->stock_id, $returnedStockIds)) {
                     continue;
                 }
-                $saleRevenue += $item->actual_sell_price * $item->qty;
                 if (!$item->is_trade_in_item) {
+                    $saleRevenue += $item->actual_sell_price * $item->qty;
                     $saleHpp += $item->buy_price_snap * $item->qty;
                     $allTimeSoldItems += $item->qty;
                 }
