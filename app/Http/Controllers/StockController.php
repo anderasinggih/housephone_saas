@@ -114,7 +114,7 @@ class StockController extends Controller
         }
 
         $validated = $request->validate([
-            'store_id' => 'required|string',
+            'store_id' => 'required',
             'category' => 'required|in:iphone,android,accessories,extra',
             'type' => 'required|in:new,second',
             'name' => 'required|string',

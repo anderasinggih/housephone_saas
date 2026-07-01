@@ -1285,7 +1285,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                         <div>
                                             <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Masa Garansi Toko (Hari)</label>
                                             <input
-                                                type="number"
+                                                type="text"
                                                 required
                                                 inputMode="numeric"
                                                 value={singleForm.data.warranty_duration_days}
@@ -1297,9 +1297,8 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                             <div>
                                                 <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Quantity (Stok)</label>
                                                 <input
-                                                    type="number"
+                                                    type="text"
                                                     required
-                                                    min={1}
                                                     inputMode="numeric"
                                                     value={singleForm.data.qty}
                                                     onChange={e => singleForm.setData('qty', parseInt(e.target.value) || 1)}
@@ -1331,10 +1330,9 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                         <div>
                                             <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Harga Modal Beli (HPP)</label>
                                             <input
-                                                type="number"
+                                                type="text"
                                                 required
-                                                min={0}
-                                                inputMode="numeric"
+                                                inputMode="decimal"
                                                 value={singleForm.data.buy_price ?? ''}
                                                 onChange={e => singleForm.setData('buy_price', e.target.value === '' ? '' : parseFloat(e.target.value))}
                                                 placeholder="Masukkan harga beli"
@@ -1345,10 +1343,9 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                         <div>
                                             <label className="block text-xs font-bold uppercase text-gray-400 mb-1">Harga Jual Retail</label>
                                             <input
-                                                type="number"
+                                                type="text"
                                                 required
-                                                min={0}
-                                                inputMode="numeric"
+                                                inputMode="decimal"
                                                 value={singleForm.data.sell_price ?? ''}
                                                 onChange={e => singleForm.setData('sell_price', e.target.value === '' ? '' : parseFloat(e.target.value))}
                                                 placeholder="Masukkan harga jual"
