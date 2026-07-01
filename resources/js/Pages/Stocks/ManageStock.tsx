@@ -1100,13 +1100,20 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                     )}
                                 </div>
                             )}
-
                         </div>
                     ) : isAddingNewStock ? (
                         <div className="rounded-none sm:rounded-lg border-x-0 sm:border border-y-0 sm:border-y bg-transparent sm:bg-card p-0 sm:p-6 shadow-none sm:shadow-sm text-card-foreground">
                             <h3 className="text-lg font-semibold text-foreground mb-6">Tambah Stok Unit Baru</h3>
                             
                             <form onSubmit={submitSingle} className="space-y-6">
+                                {Object.keys(singleForm.errors).length > 0 && (
+                                    <div className="rounded-xl bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900 p-4 text-xs font-bold text-rose-600 dark:text-rose-400 space-y-1.5">
+                                        <p className="text-sm font-extrabold">Gagal menyimpan! Periksa kolom berikut:</p>
+                                        {Object.entries(singleForm.errors).map(([key, err]) => (
+                                            <div key={key}>• {key}: {err}</div>
+                                        ))}
+                                    </div>
+                                )}
                                 {/* Section 1: Lokasi & Kategori */}
                                 <div className="p-0 sm:p-4 rounded-none sm:rounded-xl border-0 sm:border border-transparent sm:border-border dark:sm:border-input bg-transparent sm:bg-muted/20 space-y-4">
                                     <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">1. Lokasi & Kategori Unit</h4>
