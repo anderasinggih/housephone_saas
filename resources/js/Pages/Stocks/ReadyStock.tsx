@@ -219,6 +219,15 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
     // Open Checkout Modal
     const openCheckout = (stock: StockItem) => {
         setSelectedStock(stock);
+        // Auto-populate extras from available add-ons using their preset default_charge_to
+        const availableExtras = stocks
+            .filter(s => s.category === 'extra' && s.status === 'available')
+            .map(addon => ({
+                extra_id: addon.id,
+                charge_to: (addon.default_charge_to || 'buyer') as 'buyer' | 'seller' | 'free_promotion',
+                sell_price: addon.sell_price,
+                buy_price: addon.buy_price,
+            }));
         checkoutForm.setData({
             store_id: stock.store_id || '',
             buyer_name: '',
@@ -233,7 +242,7 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
             transaction_date: getLocalDateTimeString(),
             items: [{ stock_id: stock.id, qty: 1, actual_sell_price: stock.sell_price }],
             trade_in: null,
-            extras: []
+            extras: availableExtras,
         });
         setIsCheckoutOpen(true);
     };
@@ -1077,34 +1086,33 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                 {extraAddons.length === 0 ? (
                                     <p className="text-xs text-gray-400 font-bold">Tidak ada jasa/add-on aktif di sistem saat ini.</p>
                                 ) : (
-                                    <div className="space-y-3">
+                                    <div className="space-y-2">
+                                        <p className="text-[10px] text-gray-400 font-semibold">Centang/uncentang untuk include/exclude. Siapa yang menanggung sudah diatur di Sale Data.</p>
                                         {extraAddons.map(addon => {
                                             const selectedExtra = checkoutForm.data.extras.find(e => e.extra_id === addon.id);
+                                            const chargeLabel = selectedExtra?.charge_to === 'seller'
+                                                ? { text: 'Toko Tanggung', cls: 'bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900' }
+                                                : selectedExtra?.charge_to === 'free_promotion'
+                                                    ? { text: 'Promosi Free', cls: 'bg-emerald-100 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900' }
+                                                    : { text: 'Buyer Bayar', cls: 'bg-indigo-100 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900' };
                                             return (
-                                                <div key={addon.id} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border border-border dark:border-input p-3 rounded-xl">
-                                                    <label className="flex items-center gap-2 text-xs font-bold text-gray-700 dark:text-gray-300">
-                                                        <input 
-                                                            type="checkbox" 
-                                                            checked={!!selectedExtra} 
-                                                            onChange={() => toggleAddon(addon)} 
-                                                            className="rounded text-indigo-600 focus:ring-indigo-500" 
+                                                <label key={addon.id} className={`flex items-center justify-between gap-3 border p-3 rounded-xl cursor-pointer transition ${selectedExtra ? 'border-indigo-300 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/10' : 'border-border dark:border-input opacity-60'}`}>
+                                                    <div className="flex items-center gap-2 text-xs font-bold text-gray-700 dark:text-gray-300">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={!!selectedExtra}
+                                                            onChange={() => toggleAddon(addon)}
+                                                            className="rounded text-indigo-600 focus:ring-indigo-500"
                                                         />
-                                                        {addon.name} ({formatCurrency(addon.sell_price)})
-                                                    </label>
+                                                        <span>{addon.name}</span>
+                                                        <span className="text-gray-400 font-semibold">({formatCurrency(addon.sell_price)})</span>
+                                                    </div>
                                                     {selectedExtra && (
-                                                        <div className="flex gap-2">
-                                                            <select
-                                                                value={selectedExtra.charge_to}
-                                                                onChange={e => updateAddonCharge(addon.id, e.target.value as any)}
-                                                                className="rounded-lg border border-input bg-card px-2 py-1 text-xs font-bold focus:outline-none dark:border-input dark:bg-background"
-                                                            >
-                                                                <option value="buyer">Bebankan ke Pembeli</option>
-                                                                <option value="seller">Toko Tanggung</option>
-                                                                <option value="free_promotion">Promosi Free</option>
-                                                            </select>
-                                                        </div>
+                                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${chargeLabel.cls}`}>
+                                                            {chargeLabel.text}
+                                                        </span>
                                                     )}
-                                                </div>
+                                                </label>
                                             );
                                         })}
                                     </div>
