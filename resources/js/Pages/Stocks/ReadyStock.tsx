@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, useForm, usePage } from '@inertiajs/react';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { 
     Search, 
     Smartphone, 
@@ -48,6 +48,7 @@ interface StockItem {
     license_id: number | null;
     serial_number: string | null;
     imei_1: string | null;
+    imei_2: string | null;
     supplier: string | null;
     warranty_duration_days: number;
     buy_price: number;
@@ -138,6 +139,8 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
     const [selectedStock, setSelectedStock] = useState<StockItem | null>(null);
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
     const [isTransferOpen, setIsTransferOpen] = useState(false);
+    const [showBuyerSearchModal, setShowBuyerSearchModal] = useState(false);
+    const [buyerSearchQuery, setBuyerSearchQuery] = useState('');
     // Success modal with WA/invoice
     const [successData, setSuccessData] = useState<{ invoiceNumber: string; buyerPhone: string; buyerName: string; total: number } | null>(null);
 
@@ -152,6 +155,12 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
 
     // Filter available Extra add-ons
     const extraAddons = stocks.filter(s => s.category === 'extra' && s.status === 'available');
+
+    // Filter old customers based on modal search input
+    const filteredBuyers = buyers.filter(b => 
+        b.name.toLowerCase().includes(buyerSearchQuery.toLowerCase()) ||
+        b.phone.includes(buyerSearchQuery)
+    );
 
     const getLocalDateTimeString = () => {
         const tzoffset = (new Date()).getTimezoneOffset() * 60000;
@@ -193,7 +202,9 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
 
     // Handle Search filter
     const filteredStocks = stocks.filter((item) => {
-        const matchesCategory = activeTab === 'all' ? true : item.category === activeTab;
+        const matchesCategory = activeTab === 'all' 
+            ? (item.category !== 'extra' && item.category !== 'accessories') 
+            : item.category === activeTab;
         const matchesSearch = 
             item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
             (item.serial_number && item.serial_number.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -224,6 +235,58 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
         });
         setIsCheckoutOpen(true);
     };
+
+    // Global Keydown Barcode Scanner Listener
+    useEffect(() => {
+        let buffer = '';
+        let lastKeyTime = Date.now();
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Ignore if checkout modal is already open
+            if (isCheckoutOpen) return;
+
+            // Ignore if active element is a form input (unless it's the search input, where we handle Enter)
+            const target = e.target as HTMLElement;
+            const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
+            
+            // Ignore if inside an active form input
+            if (isInput && target.id !== 'search-ready-stock-input') {
+                return;
+            }
+
+            const currentTime = Date.now();
+            
+            // Barcode scanners type very quickly (usually less than 80ms between keys)
+            if (currentTime - lastKeyTime > 80) {
+                buffer = ''; // Reset buffer if manual typing
+            }
+
+            lastKeyTime = currentTime;
+
+            if (e.key === 'Enter') {
+                if (buffer.length > 3) {
+                    const cleanCode = buffer.trim();
+                    const found = stocks.find(item => 
+                        (item.serial_number && item.serial_number.toLowerCase() === cleanCode.toLowerCase()) ||
+                        (item.imei_1 && item.imei_1 === cleanCode) ||
+                        (item.imei_2 && item.imei_2 === cleanCode)
+                    );
+                    if (found) {
+                        e.preventDefault();
+                        openCheckout(found);
+                    }
+                    buffer = '';
+                }
+            } else if (e.key.length === 1) {
+                buffer += e.key;
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [stocks, isCheckoutOpen]);
 
     // Open Transfer Modal
     const openTransfer = (stock: StockItem) => {
@@ -415,10 +478,25 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                         <div className="relative flex-1">
                             <Search className="absolute left-3.5 top-3 h-4 w-4 text-gray-400" />
                             <input
+                                id="search-ready-stock-input"
                                 type="text"
                                 placeholder="Cari nama, serial number, IMEI..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && searchQuery.trim().length > 3) {
+                                        const cleanQuery = searchQuery.trim().toLowerCase();
+                                        const found = stocks.find(item => 
+                                            (item.serial_number && item.serial_number.toLowerCase() === cleanQuery) ||
+                                            (item.imei_1 && item.imei_1 === cleanQuery) ||
+                                            (item.imei_2 && item.imei_2 === cleanQuery)
+                                        );
+                                        if (found) {
+                                            e.preventDefault();
+                                            openCheckout(found);
+                                        }
+                                    }
+                                }}
                                 className="w-full rounded-xl border border-input bg-background pl-10 pr-4 py-2.5 text-sm font-bold text-foreground shadow-sm focus:border-indigo-500 focus:outline-none"
                             />
                         </div>
@@ -626,6 +704,22 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                             {formatCurrency(selectedStockDetail.sell_price)}
                                         </span>
                                     </div>
+                                    {['superadmin', 'viewer'].includes(authUser.role) && (
+                                        <>
+                                            <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
+                                                <span className="text-gray-400 uppercase text-[10px]">Harga Beli (HPP)</span>
+                                                <span className="text-right font-semibold text-foreground">
+                                                    {formatCurrency(selectedStockDetail.buy_price)}
+                                                </span>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
+                                                <span className="text-gray-400 uppercase text-[10px]">Ekspetasi Profit</span>
+                                                <span className="text-right font-bold text-emerald-600 dark:text-emerald-400">
+                                                    {formatCurrency((selectedStockDetail.sell_price - selectedStockDetail.buy_price) * selectedStockDetail.qty)}
+                                                </span>
+                                            </div>
+                                        </>
+                                    )}
                                     <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
                                         <span className="text-gray-400 uppercase text-[10px]">Garansi</span>
                                         <span className="text-right text-foreground">{selectedStockDetail.warranty_duration_days} Hari</span>
@@ -745,23 +839,19 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                     <User className="h-4 w-4" /> Data Pelanggan
                                 </h5>
 
-                                {/* Existing Buyer Search */}
+                                {/* Existing Buyer Search Button */}
                                 {buyers.length > 0 && (
                                     <div>
-                                        <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Cari Pelanggan Lama</label>
-                                        <select
-                                            onChange={(e) => {
-                                                const found = buyers.find(b => b.id.toString() === e.target.value);
-                                                if (found) selectBuyer(found);
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setBuyerSearchQuery('');
+                                                setShowBuyerSearchModal(true);
                                             }}
-                                            defaultValue=""
-                                            className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold text-gray-800 dark:border-input dark:bg-background dark:text-gray-100"
+                                            className="w-full rounded-xl border border-dashed border-indigo-500 bg-indigo-500/5 hover:bg-indigo-500/10 py-2.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 flex items-center justify-center gap-1.5 transition"
                                         >
-                                            <option value="">-- Pilih pelanggan lama atau isi manual --</option>
-                                            {buyers.map(b => (
-                                                <option key={b.id} value={b.id}>{b.name} — {b.phone}</option>
-                                            ))}
-                                        </select>
+                                            <Search className="h-3.5 w-3.5" /> Cari Pelanggan Terdaftar
+                                        </button>
                                     </div>
                                 )}
 
@@ -813,13 +903,15 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                     <div>
                                         <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Harga Kesepakatan (Nego)</label>
                                         <input
-                                            type="number"
+                                            type="text"
+                                            inputMode="numeric"
+                                            pattern="[0-9]*"
                                             required
-                                            min={0}
                                             value={checkoutForm.data.items[0]?.actual_sell_price ?? ''}
                                             onChange={e => {
+                                                const val = e.target.value.replace(/[^0-9]/g, '');
                                                 const items = [...checkoutForm.data.items];
-                                                items[0].actual_sell_price = e.target.value === '' ? '' : parseFloat(e.target.value);
+                                                items[0].actual_sell_price = val === '' ? '' : parseFloat(val);
                                                 checkoutForm.setData('items', items);
                                             }}
                                             className={`w-full rounded-xl border px-3.5 py-2 text-sm font-bold bg-card text-gray-800 dark:bg-background dark:text-gray-100 focus:outline-none ${checkoutForm.errors['items.0.actual_sell_price'] ? 'border-rose-400' : 'border-input dark:border-input'}`}
@@ -860,10 +952,14 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                     <div>
                                         <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Uang Muka / DP Booking (Opsional)</label>
                                         <input
-                                            type="number"
-                                            min={0}
+                                            type="text"
+                                            inputMode="numeric"
+                                            pattern="[0-9]*"
                                             value={checkoutForm.data.dp_amount ?? ''}
-                                            onChange={e => checkoutForm.setData('dp_amount', e.target.value === '' ? '' : parseFloat(e.target.value))}
+                                            onChange={e => {
+                                                const val = e.target.value.replace(/[^0-9]/g, '');
+                                                checkoutForm.setData('dp_amount', val === '' ? '' : parseFloat(val));
+                                            }}
                                             className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold text-gray-800 dark:border-input dark:bg-background dark:text-gray-100"
                                             placeholder="0"
                                         />
@@ -895,10 +991,14 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                     <div>
                                         <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Komisi Affiliate</label>
                                         <input
-                                            type="number"
-                                            min={0}
+                                            type="text"
+                                            inputMode="numeric"
+                                            pattern="[0-9]*"
                                             value={checkoutForm.data.affiliate_fee ?? ''}
-                                            onChange={e => checkoutForm.setData('affiliate_fee', e.target.value === '' ? '' : parseFloat(e.target.value))}
+                                            onChange={e => {
+                                                const val = e.target.value.replace(/[^0-9]/g, '');
+                                                checkoutForm.setData('affiliate_fee', val === '' ? '' : parseFloat(val));
+                                            }}
                                             className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold text-gray-800 dark:border-input dark:bg-background dark:text-gray-100"
                                             placeholder="Nominal komisi"
                                         />
@@ -1190,6 +1290,56 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                             >
                                 Tutup
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Buyer Search Modal */}
+            {showBuyerSearchModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="w-full max-w-md rounded-lg bg-card p-6 shadow-sm border dark:border-input dark:bg-background">
+                        <div className="flex justify-between items-center pb-4 border-b border-border dark:border-input mb-4">
+                            <h4 className="text-lg font-bold text-foreground">Cari Pelanggan Terdaftar</h4>
+                            <button 
+                                onClick={() => setShowBuyerSearchModal(false)} 
+                                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        <div className="space-y-4">
+                            <div className="relative">
+                                <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Masukkan nama atau nomor HP..."
+                                    value={buyerSearchQuery}
+                                    onChange={e => setBuyerSearchQuery(e.target.value)}
+                                    className="w-full rounded-xl border border-input bg-card pl-10 pr-4 py-2.5 text-sm font-bold text-foreground shadow-sm focus:border-indigo-500 focus:outline-none dark:border-input dark:bg-background"
+                                />
+                            </div>
+                            <div className="max-h-60 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800 border rounded-xl dark:border-input">
+                                {filteredBuyers.length === 0 ? (
+                                    <p className="text-center text-xs text-gray-400 py-6">Pelanggan tidak ditemukan.</p>
+                                ) : (
+                                    filteredBuyers.map(b => (
+                                        <div
+                                            key={b.id}
+                                            onClick={() => {
+                                                selectBuyer(b);
+                                                setShowBuyerSearchModal(false);
+                                            }}
+                                            className="p-3 hover:bg-muted/50 dark:hover:bg-gray-900/50 cursor-pointer flex justify-between items-center text-xs font-bold"
+                                        >
+                                            <div className="min-w-0 pr-2">
+                                                <p className="text-foreground truncate">{b.name}</p>
+                                                <p className="text-gray-400 font-normal truncate">{b.address || 'Tanpa alamat'}</p>
+                                            </div>
+                                            <span className="text-indigo-600 dark:text-indigo-400 font-mono flex-shrink-0">{b.phone}</span>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>

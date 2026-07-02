@@ -59,6 +59,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/shifts/clock-out', [ShiftController::class, 'clockOut'])->name('shifts.clock-out');
     Route::post('/shifts/cash-drop', [ShiftController::class, 'cashDrop'])->name('shifts.cash-drop');
     Route::post('/shifts/petty-cash', [ShiftController::class, 'pettyCash'])->name('shifts.petty-cash');
+    Route::put('/shifts/{shift}', [ShiftController::class, 'update'])->name('shifts.update');
+    Route::delete('/shifts/{shift}', [ShiftController::class, 'destroy'])->name('shifts.destroy');
 
     // User Management
     Route::get('/users', [UserController::class, 'index'])->name('users.index');
@@ -77,6 +79,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/settings/general', [\App\Http\Controllers\GeneralSettingsController::class, 'update'])->name('settings.general.update');
     Route::post('/settings/schedule', [\App\Http\Controllers\GeneralSettingsController::class, 'storeSchedule'])->name('settings.schedule.store');
     Route::delete('/settings/schedule/{schedule}', [\App\Http\Controllers\GeneralSettingsController::class, 'destroySchedule'])->name('settings.schedule.destroy');
+
+    // Money Notes
+    Route::get('/money-notes', [\App\Http\Controllers\MoneyNoteController::class, 'index'])->name('money-notes.index');
+    Route::post('/money-notes', [\App\Http\Controllers\MoneyNoteController::class, 'store'])->name('money-notes.store');
+    Route::delete('/money-notes/{moneyNote}', [\App\Http\Controllers\MoneyNoteController::class, 'destroy'])->name('money-notes.destroy');
+    Route::post('/money-notes/category', [\App\Http\Controllers\MoneyNoteController::class, 'storeCategory'])->name('money-notes.category.store');
 
     // Profile
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

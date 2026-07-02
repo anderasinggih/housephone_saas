@@ -60,6 +60,29 @@ interface DashboardProps {
         month: number;
         year: number;
     };
+    todayStats: {
+        gabungan: {
+            revenue: number;
+            netProfit: number;
+            soldItems: number;
+            transactions: number;
+            store_name: string;
+        } | null;
+        stores: Array<{
+            revenue: number;
+            netProfit: number;
+            soldItems: number;
+            transactions: number;
+            store_name: string;
+        }>;
+        store: {
+            revenue: number;
+            netProfit: number;
+            soldItems: number;
+            transactions: number;
+            store_name: string;
+        } | null;
+    };
 }
 
 // Custom Premium Donut Chart Component using SVG (proportional and mathematically correct)
@@ -389,6 +412,7 @@ export default function Dashboard({
     topProducts, 
     activeStoreName,
     filters,
+    todayStats,
 }: DashboardProps) {
     const authUser = usePage().props.auth.user as any;
     const isKaryawan = authUser.role === 'karyawan';
@@ -506,6 +530,113 @@ export default function Dashboard({
                                 <p className="mt-2 text-[10px] font-bold text-muted-foreground leading-normal">Total item terjual sepanjang masa</p>
                             </div>
                         </div>
+                    </div>
+
+                    {/* Ringkasan Hari Ini Section */}
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">RINGKASAN HARI INI</h3>
+                            <span className="text-[10px] font-bold text-muted-foreground">Tanggal: {new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                        </div>
+                        {authUser.role === 'superadmin' ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                {/* Gabungan Semua Card */}
+                                {todayStats.gabungan && (
+                                    <div className="rounded-lg border-2 border-primary/50 bg-primary/5 p-4 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                                        <div className="absolute top-0 right-0 p-1 bg-primary text-[8px] font-extrabold uppercase text-primary-foreground tracking-wider rounded-bl">
+                                            UTAMA
+                                        </div>
+                                        <div>
+                                            <h4 className="text-xs font-black text-primary border-b border-primary/20 pb-1.5 mb-2 flex items-center gap-1.5">
+                                                <StoreIcon className="h-3.5 w-3.5" />
+                                                {todayStats.gabungan.store_name}
+                                            </h4>
+                                            <div className="grid grid-cols-2 gap-x-2 gap-y-2 mt-2">
+                                                <div>
+                                                    <p className="text-[8px] font-extrabold uppercase text-muted-foreground">Total Omset</p>
+                                                    <p className="text-sm font-extrabold text-foreground">{formatIDR(todayStats.gabungan.revenue)}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[8px] font-extrabold uppercase text-muted-foreground">Total Laba Bersih</p>
+                                                    <p className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400">{formatIDR(todayStats.gabungan.netProfit)}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[8px] font-extrabold uppercase text-muted-foreground">Total Terjual</p>
+                                                    <p className="text-xs font-bold text-foreground">{todayStats.gabungan.soldItems} Unit</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[8px] font-extrabold uppercase text-muted-foreground">Total Transaksi</p>
+                                                    <p className="text-xs font-bold text-foreground">{todayStats.gabungan.transactions} TRX</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                {/* Individual Store Cards */}
+                                {todayStats.stores.map((storeStat, idx) => (
+                                    <div key={idx} className="rounded-lg border border-border bg-card p-4 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                                        <div>
+                                            <h4 className="text-xs font-bold text-foreground border-b border-border/40 pb-1.5 mb-2 flex items-center gap-1.5">
+                                                <StoreIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                                                {storeStat.store_name}
+                                            </h4>
+                                            <div className="grid grid-cols-2 gap-x-2 gap-y-2 mt-2">
+                                                <div>
+                                                    <p className="text-[8px] font-extrabold uppercase text-muted-foreground">Omset</p>
+                                                    <p className="text-xs font-extrabold text-foreground">{formatIDR(storeStat.revenue)}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[8px] font-extrabold uppercase text-muted-foreground">Laba Bersih</p>
+                                                    <p className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">{formatIDR(storeStat.netProfit)}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[8px] font-extrabold uppercase text-muted-foreground">Terjual</p>
+                                                    <p className="text-xs font-bold text-foreground">{storeStat.soldItems} Unit</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[8px] font-extrabold uppercase text-muted-foreground">Transaksi</p>
+                                                    <p className="text-xs font-bold text-foreground">{storeStat.transactions} TRX</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="max-w-md">
+                                {todayStats.store && (
+                                    <div className="rounded-lg border border-border bg-card p-4 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                                        <div>
+                                            <h4 className="text-xs font-bold text-foreground border-b border-border/40 pb-1.5 mb-2 flex items-center gap-1.5">
+                                                <StoreIcon className="h-3.5 w-3.5 text-primary" />
+                                                {todayStats.store.store_name}
+                                            </h4>
+                                            <div className="grid grid-cols-2 gap-x-2 gap-y-2 mt-2">
+                                                <div>
+                                                    <p className="text-[8px] font-extrabold uppercase text-muted-foreground">Omset Hari Ini</p>
+                                                    <p className="text-xs font-extrabold text-foreground">{formatIDR(todayStats.store.revenue)}</p>
+                                                </div>
+                                                {!isKaryawan && (
+                                                    <div>
+                                                        <p className="text-[8px] font-extrabold uppercase text-muted-foreground">Laba Bersih</p>
+                                                        <p className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">{formatIDR(todayStats.store.netProfit)}</p>
+                                                    </div>
+                                                )}
+                                                <div>
+                                                    <p className="text-[8px] font-extrabold uppercase text-muted-foreground">Terjual</p>
+                                                    <p className="text-xs font-bold text-foreground">{todayStats.store.soldItems} Unit</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[8px] font-extrabold uppercase text-muted-foreground">Transaksi</p>
+                                                    <p className="text-xs font-bold text-foreground">{todayStats.store.transactions} TRX</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     {/* Filter & Period Selector */}

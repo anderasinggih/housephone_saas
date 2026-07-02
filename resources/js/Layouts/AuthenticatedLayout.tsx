@@ -20,7 +20,8 @@ import {
     Activity,
     MoreHorizontal,
     LogOut,
-    User
+    User,
+    Banknote
 } from 'lucide-react';
 
 export default function Authenticated({
@@ -124,6 +125,7 @@ export default function Authenticated({
         
         if (user.role === 'superadmin') {
             items.push({ name: 'Stores', href: route('stores.index'), icon: Store, current: route().current('stores.index') });
+            items.push({ name: 'Money Notes', href: route('money-notes.index'), icon: Banknote, current: route().current('money-notes.index') });
         }
         
         return items;
@@ -199,14 +201,24 @@ export default function Authenticated({
                                 </Link>
 
                                 {user.role === 'superadmin' && (
-                                    <Link
-                                        href={route('stores.index')}
-                                        className={getLinkClass(route().current('stores.index'))}
-                                        title="Stores"
-                                    >
-                                        <Store className="h-4 w-4" />
-                                        <span>Stores</span>
-                                    </Link>
+                                    <>
+                                        <Link
+                                            href={route('stores.index')}
+                                            className={getLinkClass(route().current('stores.index'))}
+                                            title="Stores"
+                                        >
+                                            <Store className="h-4 w-4" />
+                                            <span>Stores</span>
+                                        </Link>
+                                        <Link
+                                            href={route('money-notes.index')}
+                                            className={getLinkClass(route().current('money-notes.index'))}
+                                            title="Money Notes"
+                                        >
+                                            <Banknote className="h-4 w-4" />
+                                            <span>Money Notes</span>
+                                        </Link>
+                                    </>
                                 )}
 
                                 <Link

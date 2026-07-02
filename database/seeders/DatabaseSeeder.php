@@ -83,6 +83,16 @@ class DatabaseSeeder extends Seeder
             $licIds[$lic] = $val->id;
         }
 
+        // Seed Money Note Categories
+        $inCategories = ['Penjualan Luar', 'Investasi', 'Lainnya'];
+        foreach ($inCategories as $cat) {
+            \App\Models\MoneyNoteCategory::firstOrCreate(['name' => $cat, 'type' => 'in']);
+        }
+        $outCategories = ['Operasional', 'Gaji', 'Sewa', 'Lainnya'];
+        foreach ($outCategories as $cat) {
+            \App\Models\MoneyNoteCategory::firstOrCreate(['name' => $cat, 'type' => 'out']);
+        }
+
         $this->call(TsvDataSeeder::class);
     }
 }

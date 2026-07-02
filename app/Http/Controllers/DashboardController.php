@@ -18,9 +18,9 @@ class DashboardController extends Controller
     {
         $user = $request->user();
 
-        // Viewers and Employees are scoped to their store. Superadmin can filter.
+        // Viewers and Superadmins can see all stores and filter. Employees are scoped to their store.
         $storeId = $user->store_id;
-        if ($user->role === 'superadmin' && $request->has('store_id')) {
+        if (in_array($user->role, ['superadmin', 'viewer']) && $request->has('store_id')) {
             $storeId = $request->input('store_id');
         }
 
@@ -109,7 +109,7 @@ class DashboardController extends Controller
             $rev = $sale->total_amount;
             $hpp = 0;
             foreach ($sale->items as $item) {
-                $hpp += ($item->stock->buy_price ?? 0) * $item->qty;
+                $hpp += ($item->buy_price_snap ?? 0) * $item->qty;
             }
             $pendingProfit += ($rev - $hpp);
         }
@@ -245,8 +245,8 @@ class DashboardController extends Controller
             })
             ->values();
 
-        // Fetch stores list for superadmin filter
-        $stores = $user->role === 'superadmin' ? Store::all() : [];
+        // Fetch stores list for superadmin and viewer filter
+        $stores = in_array($user->role, ['superadmin', 'viewer']) ? Store::all() : [];
 
         // Fetch recent sales (scoped by store, latest 5)
         $recentSales = Sale::with(['buyer', 'user'])
@@ -282,6 +282,111 @@ class DashboardController extends Controller
 
         $activeAffiliatorsCount = $sales->whereNotNull('affiliate_user_id')->pluck('affiliate_user_id')->unique()->count();
 
+        // --- Today's (Hari Ini) Statistics ---
+        $todayDate = now()->toDateString();
+        $todaySales = Sale::where('status', 'completed')
+            ->whereDate('created_at', $todayDate)
+            ->with(['items.stock', 'extras', 'returns'])
+            ->get();
+
+        $todayReturns = ReturnLog::whereDate('created_at', $todayDate)
+            ->with('sale')
+            ->get();
+
+        $todayRepairs = WarrantyRepair::where('status', 'repaired')
+            ->whereDate('created_at', $todayDate)
+            ->with('sale')
+            ->get();
+
+        $calculateMetrics = function ($sales, $returns, $repairs, $role) {
+            $revenue = 0;
+            $hpp = 0;
+            $soldItems = 0;
+
+            foreach ($sales as $sale) {
+                $returnedStockIds = $sale->returns->pluck('stock_id')->toArray();
+                $saleRevenue = 0;
+                $saleHpp = 0;
+
+                foreach ($sale->items as $item) {
+                    if (in_array($item->stock_id, $returnedStockIds)) {
+                        continue;
+                    }
+                    if (!$item->is_trade_in_item) {
+                        $saleRevenue += $item->actual_sell_price * $item->qty;
+                        $saleHpp += $item->buy_price_snap * $item->qty;
+                        $soldItems += $item->qty;
+                    }
+                }
+
+                foreach ($sale->extras as $extra) {
+                    if ($extra->charge_to === 'buyer') {
+                        $saleRevenue += $extra->sell_price;
+                    } elseif ($extra->charge_to === 'seller') {
+                        $saleHpp += $extra->buy_price;
+                    }
+                }
+
+                $revenue += $saleRevenue;
+                $hpp += $saleHpp;
+            }
+
+            $repairsCost = $repairs->sum('repair_cost');
+            $returnPenalty = $returns->sum('restocking_fee');
+            $affiliateFee = $sales->sum('affiliate_fee');
+            $netProfit = $revenue - $hpp - $repairsCost + $returnPenalty - $affiliateFee;
+
+            return [
+                'revenue' => (float)$revenue,
+                'netProfit' => $role === 'karyawan' ? 0 : (float)$netProfit,
+                'soldItems' => (int)$soldItems,
+                'transactions' => $sales->count(),
+            ];
+        };
+
+        $todayStats = [
+            'gabungan' => null,
+            'stores' => [],
+            'store' => null,
+        ];
+
+        if (in_array($user->role, ['superadmin', 'viewer'])) {
+            // Combined/Gabungan
+            $todayStats['gabungan'] = array_merge(
+                $calculateMetrics($todaySales, $todayReturns, $todayRepairs, $user->role),
+                ['store_name' => 'Gabungan Semua']
+            );
+
+            // Per Store
+            $allStoresList = Store::all();
+            foreach ($allStoresList as $store) {
+                $storeSales = $todaySales->where('store_id', $store->id);
+                $storeReturns = $todayReturns->filter(fn($r) => $r->sale && $r->sale->store_id == $store->id);
+                $storeRepairs = $todayRepairs->filter(fn($r) => $r->sale && $r->sale->store_id == $store->id);
+
+                $todayStats['stores'][] = array_merge(
+                    $calculateMetrics($storeSales, $storeReturns, $storeRepairs, $user->role),
+                    ['store_name' => $store->name]
+                );
+            }
+        } else {
+            // Non-superadmin/viewer: only show their own store's today statistics
+            $storeId = $user->store_id;
+            if ($storeId) {
+                $store = Store::find($storeId);
+                if ($store) {
+                    $storeSales = $todaySales->where('store_id', $storeId);
+                    $storeReturns = $todayReturns->filter(fn($r) => $r->sale && $r->sale->store_id == $storeId);
+                    $storeRepairs = $todayRepairs->filter(fn($r) => $r->sale && $r->sale->store_id == $storeId);
+
+                    $todayStats['store'] = array_merge(
+                        $calculateMetrics($storeSales, $storeReturns, $storeRepairs, $user->role),
+                        ['store_name' => $store->name]
+                    );
+                }
+            }
+        }
+
         return Inertia::render('Dashboard', [
             'stats' => [
                 'totalRevenue' => (float)$totalRevenue,
@@ -313,7 +418,8 @@ class DashboardController extends Controller
                 'store_id' => $storeId,
                 'month' => $month,
                 'year' => $year,
-            ]
+            ],
+            'todayStats' => $todayStats,
         ]);
     }
 }

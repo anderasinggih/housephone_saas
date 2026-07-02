@@ -94,12 +94,14 @@ interface ManageStockProps {
 export default function ManageStock({ stocks, stores, parameters, filters }: ManageStockProps) {
     const authUser = usePage().props.auth.user as any;
     const isSuperAdmin = authUser.role === 'superadmin';
+    const canSeeFinancials = ['superadmin', 'viewer'].includes(authUser.role);
     const [storeFilterId, setStoreFilterId] = useState(filters?.store_id || '');
     const [isAddingNewStock, setIsAddingNewStock] = useState(false);
     const [isEditingStock, setIsEditingStock] = useState(false);
     const [trashFilter, setTrashFilter] = useState<'active' | 'trash'>('active');
     const [selectedStockDetail, setSelectedStockDetail] = useState<StockItem | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [categoryFilter, setCategoryFilter] = useState<string>('all');
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({
         key: 'created_at',
         direction: 'desc'
@@ -108,7 +110,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchQuery, storeFilterId, trashFilter]);
+    }, [searchQuery, storeFilterId, trashFilter, categoryFilter]);
 
     const uniqueProductNames = Array.from(new Set(stocks.map(s => s.name).filter(Boolean)));
 
@@ -118,6 +120,11 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
             if (!item.deleted_at) return false;
         } else {
             if (item.deleted_at) return false;
+        }
+
+        // Filter by category
+        if (categoryFilter !== 'all' && item.category !== categoryFilter) {
+            return false;
         }
 
         const matchesSearch = 
@@ -499,6 +506,19 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                 />
                             </div>
                         )}
+                        {!isAddingNewStock && !isEditingStock && (
+                            <select
+                                value={categoryFilter}
+                                onChange={e => setCategoryFilter(e.target.value)}
+                                className="rounded-xl border border-input bg-card px-4 py-2 text-sm font-bold text-foreground shadow-sm focus:border-indigo-500 focus:outline-none dark:bg-background"
+                            >
+                                <option value="all">Semua Kategori</option>
+                                <option value="iphone">iPhone</option>
+                                <option value="android">Android</option>
+                                <option value="accessories">Aksesoris (Bulk)</option>
+                                <option value="extra">Add-On / Jasa</option>
+                            </select>
+                        )}
                         {isSuperAdmin && !isAddingNewStock && !isEditingStock && (
                             <select
                                 value={trashFilter}
@@ -859,7 +879,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
  
                             {/* Detail Panel */}
                             {selectedStockDetail && (
-                                <div className="w-full lg:w-1/3 rounded-lg border border-border bg-card p-6 shadow-sm text-card-foreground space-y-6 self-start lg:sticky lg:top-4 max-h-[calc(100vh-6rem)] overflow-y-auto transition-all duration-300">
+                                <div className="w-full lg:w-1/3 rounded-lg border border-border bg-card p-6 shadow-sm text-card-foreground space-y-6 self-start lg:sticky lg:top-4 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto transition-all duration-300">
                                     
                                     {/* Breadcrumb & Close Button */}
                                     <div className="flex items-center justify-between border-b border-border dark:border-input pb-3">
@@ -937,7 +957,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                             </>
                                         )}
                                         
-                                        {isSuperAdmin && (
+                                        {canSeeFinancials && (
                                             <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
                                                 <span className="text-indigo-600 dark:text-indigo-400 uppercase text-[10px]">Harga Beli (HPP)</span>
                                                 <span className="text-right font-bold text-indigo-600 dark:text-indigo-400">
@@ -952,6 +972,15 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                 {formatCurrency(selectedStockDetail.sell_price)}
                                             </span>
                                         </div>
+
+                                        {canSeeFinancials && (
+                                            <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
+                                                <span className="text-gray-400 uppercase text-[10px]">Ekspetasi Profit</span>
+                                                <span className="text-right font-bold text-emerald-600 dark:text-emerald-400">
+                                                    {formatCurrency((selectedStockDetail.sell_price - selectedStockDetail.buy_price) * selectedStockDetail.qty)}
+                                                </span>
+                                            </div>
+                                        )}
 
                                         {isSuperAdmin && selectedStockDetail.supplier && (
                                             <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">

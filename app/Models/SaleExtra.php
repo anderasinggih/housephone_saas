@@ -27,6 +27,6 @@ class SaleExtra extends Model
 
     public function extra(): BelongsTo
     {
-        return $this->belongsTo(Stock::class, 'extra_id');
+        return $this->belongsTo(Stock::class, 'extra_id')->withTrashed();
     }
 }

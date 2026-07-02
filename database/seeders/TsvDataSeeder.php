@@ -320,6 +320,19 @@ class TsvDataSeeder extends Seeder
                             'opened_at' => $soldDate,
                             'closed_at' => $soldDate,
                         ]);
+
+                        // Seed Attendance to populate the rekapitulasi data
+                        \App\Models\Attendance::create([
+                            'store_id' => $stockStoreId,
+                            'user_id' => $cashierId,
+                            'clock_in' => $soldDate,
+                            'clock_out' => $soldDate,
+                            'status' => 'present',
+                            'late_minutes' => rand(0, 1) ? rand(5, 45) : 0,
+                            'work_minutes' => rand(360, 540),
+                            'clock_in_lat' => -7.4244,
+                            'clock_in_lng' => 109.2301,
+                        ]);
                     }
                     $shiftId = $shift->id;
 

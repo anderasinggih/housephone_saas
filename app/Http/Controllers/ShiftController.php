@@ -28,8 +28,8 @@ class ShiftController extends Controller
             ->first();
 
         // Get past shifts
-        $shifts = Shift::with(['store', 'user'])
-            ->when($user->role !== 'superadmin', fn($q) => $q->where('user_id', $user->id))
+        $shifts = Shift::with(['store', 'user', 'pettyCash'])
+            ->when(!in_array($user->role, ['superadmin', 'viewer']), fn($q) => $q->where('user_id', $user->id))
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -37,7 +37,7 @@ class ShiftController extends Controller
         $myStore = Store::find($user->store_id);
 
         // Fetch attendance statistics
-        if ($user->role === 'superadmin') {
+        if (in_array($user->role, ['superadmin', 'viewer'])) {
             $attendanceStats = Attendance::with('user')
                 ->select('user_id', DB::raw('count(id) as total_days'), DB::raw('sum(late_minutes) as total_late_minutes'), DB::raw('sum(work_minutes) as total_work_minutes'))
                 ->groupBy('user_id')
@@ -201,12 +201,19 @@ class ShiftController extends Controller
         }
 
         DB::transaction(function () use ($request, $user, $shift, $attendance) {
-            // Calculate system expected cash: start_cash + sales cash - returns cash - cash drops - petty cash out
-            $salesCash = DB::table('sales')
+            $completedCash = DB::table('sales')
                 ->where('shift_id', $shift->id)
                 ->where('payment_method', 'cash')
                 ->where('status', 'completed')
                 ->sum('total_amount');
+
+            $bookingCash = DB::table('sales')
+                ->where('shift_id', $shift->id)
+                ->where('payment_method', 'cash')
+                ->where('status', 'booking')
+                ->sum('dp_amount');
+
+            $salesCash = $completedCash + $bookingCash;
 
             $returnsCash = DB::table('returns')
                 ->join('sales', 'returns.sale_id', '=', 'sales.id')
@@ -316,5 +323,76 @@ class ShiftController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Kas kecil operasional berhasil dicatat.');
+    }
+
+    public function update(Request $request, Shift $shift): RedirectResponse
+    {
+        $user = $request->user();
+        if ($user->role !== 'superadmin') {
+            abort(403);
+        }
+
+        $request->validate([
+            'start_cash' => 'required|numeric|min:0',
+            'end_cash' => 'nullable|numeric|min:0',
+            'status' => 'required|in:open,closed',
+            'opened_at' => 'required|date',
+            'closed_at' => 'nullable|date',
+        ]);
+
+        DB::transaction(function () use ($request, $shift) {
+            $oldOpenedAt = $shift->opened_at;
+
+            $shift->update([
+                'start_cash' => $request->input('start_cash'),
+                'end_cash' => $request->input('end_cash'),
+                'status' => $request->input('status'),
+                'opened_at' => $request->input('opened_at'),
+                'closed_at' => $request->input('closed_at'),
+            ]);
+
+            // Try to find corresponding attendance and update it
+            $attendance = Attendance::where('user_id', $shift->user_id)
+                ->whereBetween('clock_in', [
+                    $oldOpenedAt->copy()->subMinutes(30),
+                    $oldOpenedAt->copy()->addMinutes(30)
+                ])
+                ->first();
+
+            if ($attendance) {
+                $attendance->update([
+                    'clock_in' => $request->input('opened_at'),
+                    'clock_out' => $request->input('closed_at'),
+                ]);
+            }
+        });
+
+        return redirect()->back()->with('success', 'Shift berhasil diperbarui.');
+    }
+
+    public function destroy(Request $request, Shift $shift): RedirectResponse
+    {
+        $user = $request->user();
+        if ($user->role !== 'superadmin') {
+            abort(403);
+        }
+
+        DB::transaction(function () use ($shift) {
+            // Find and delete corresponding attendance
+            $attendance = Attendance::where('user_id', $shift->user_id)
+                ->whereBetween('clock_in', [
+                    $shift->opened_at->copy()->subMinutes(30),
+                    $shift->opened_at->copy()->addMinutes(30)
+                ])
+                ->first();
+
+            if ($attendance) {
+                $attendance->delete();
+            }
+
+            $shift->delete();
+        });
+
+        return redirect()->back()->with('success', 'Shift dan absensi terkait berhasil dihapus.');
     }
 }

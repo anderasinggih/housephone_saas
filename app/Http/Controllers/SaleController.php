@@ -197,6 +197,7 @@ class SaleController extends Controller
 
             // Net amount to pay: (items + buyer_extras) - trade_in_allowance
             $finalTotal = $totalAmount + $extrasAmount - $tradeInAmount;
+            $finalTotal = max(0, $finalTotal);
 
             $sale = new Sale([
                 'invoice_number' => 'INV-' . strtoupper(Str::random(3)) . '-' . date('YmdHis'),
