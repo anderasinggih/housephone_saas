@@ -4,6 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>Invoice {{ $sale->invoice_number }} — Housephone</title>
+
+    {{-- Open Graph / WhatsApp Link Preview --}}
+    @php
+        $ogTitle = 'Invoice ' . $sale->invoice_number . ' — Housephone';
+        $ogDesc  = 'Pembeli: ' . ($sale->buyer->name ?? 'Umum') .
+                   ' | Total: Rp ' . number_format($sale->total_amount, 0, ',', '.') .
+                   ' | Status: ' . ($sale->status === 'completed' ? 'LUNAS' : strtoupper($sale->status)) .
+                   ' | Tgl: ' . $sale->created_at->format('d M Y');
+        $ogUrl   = url('/invoice/' . $sale->invoice_number);
+    @endphp
+    <meta property="og:type"        content="website">
+    <meta property="og:url"         content="{{ $ogUrl }}">
+    <meta property="og:title"       content="{{ $ogTitle }}">
+    <meta property="og:description" content="{{ $ogDesc }}">
+    <meta property="og:site_name"   content="Housephone">
+    {{-- Twitter/X Card --}}
+    <meta name="twitter:card"        content="summary">
+    <meta name="twitter:title"       content="{{ $ogTitle }}">
+    <meta name="twitter:description" content="{{ $ogDesc }}">
+
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>

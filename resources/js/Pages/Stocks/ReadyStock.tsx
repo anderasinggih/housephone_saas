@@ -469,18 +469,32 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
     // WA helpers
     const openWAChat = (phone: string, buyerName: string) => {
         const waNum = toWANumber(phone);
-        const msg = encodeURIComponent(`Halo ${buyerName}! Terima kasih sudah berbelanja di toko kami. 😊`);
+        const msg = encodeURIComponent(`Halo ${buyerName}, terima kasih sudah berbelanja di Housephone! Ada yang bisa kami bantu?`);
         window.open(`https://wa.me/${waNum}?text=${msg}`, '_blank');
     };
 
     const openWAInvoice = (phone: string, buyerName: string, invoiceNumber: string, total: number) => {
         const waNum = toWANumber(phone);
         const invoiceUrl = `${window.location.origin}/invoice/${invoiceNumber}`;
-        const msg = encodeURIComponent(
-            `Halo ${buyerName}! 🛍️\n\nTerima kasih sudah berbelanja di toko kami.\n\n` +
-            `*Invoice:* ${invoiceNumber}\n*Total:* ${formatCurrency(total)}\n\n` +
-            `Lihat invoice online Anda di:\n${invoiceUrl}\n\nSalam,\nTim Toko`
-        );
+        const storeName = selectedStock ? (stocks.find(s => s.id === selectedStock.id)?.store_id ? 'Housephone' : 'Housephone') : 'Housephone';
+        const lines = [
+            `Halo ${buyerName},`,
+            ``,
+            `Terima kasih sudah berbelanja di *Housephone*!`,
+            `Berikut detail transaksi Anda:`,
+            ``,
+            `*No. Invoice :* ${invoiceNumber}`,
+            `*Total Bayar :* ${formatCurrency(total)}`,
+            ``,
+            `Silakan cek struk pembelian lengkap Anda di tautan berikut:`,
+            invoiceUrl,
+            ``,
+            `Simpan struk ini sebagai bukti garansi resmi produk Anda.`,
+            ``,
+            `Salam,`,
+            `*Tim Housephone*`,
+        ];
+        const msg = encodeURIComponent(lines.join('\n'));
         window.open(`https://wa.me/${waNum}?text=${msg}`, '_blank');
     };
 

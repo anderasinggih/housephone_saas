@@ -477,11 +477,29 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
         window.open(`https://wa.me/${waNum}?text=${msg}`, '_blank');
     };
 
-    const openWAInvoice = (phone: string, name: string, invoiceNumber: string) => {
+    const openWAInvoice = (phone: string, name: string, invoiceNumber: string, total?: number) => {
         const waNum = toWANumber(phone);
         if (!waNum) return;
         const invoiceUrl = `${window.location.origin}/invoice/${invoiceNumber}`;
-        const msg = encodeURIComponent(`Halo ${name}! 🛍️\n\nBerikut invoice belanja Anda:\n${invoiceUrl}`);
+        const totalLine = total ? `*Total Bayar :* ${formatCurrency(total)}\n` : '';
+        const lines = [
+            `Halo ${name},`,
+            ``,
+            `Terima kasih sudah berbelanja di *Housephone*!`,
+            `Berikut detail transaksi Anda:`,
+            ``,
+            `*No. Invoice :* ${invoiceNumber}`,
+            totalLine.trim(),
+            ``,
+            `Silakan cek struk pembelian lengkap Anda di tautan berikut:`,
+            invoiceUrl,
+            ``,
+            `Simpan struk ini sebagai bukti garansi resmi produk Anda.`,
+            ``,
+            `Salam,`,
+            `*Tim Housephone*`,
+        ].filter(l => l !== undefined);
+        const msg = encodeURIComponent(lines.join('\n'));
         window.open(`https://wa.me/${waNum}?text=${msg}`, '_blank');
     };
 
@@ -1093,7 +1111,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                                 {invoiceNumber && (
                                                                     <button
                                                                         type="button"
-                                                                        onClick={() => openWAInvoice(buyerPhone, buyerName, invoiceNumber)}
+                                                                        onClick={() => openWAInvoice(buyerPhone, buyerName, invoiceNumber, actPrice || undefined)}
                                                                         className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-indigo-600 py-2 text-[10px] font-bold text-white hover:bg-indigo-700 transition"
                                                                     >
                                                                         <Send className="h-3 w-3" /> Kirim Invoice
