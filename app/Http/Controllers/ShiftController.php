@@ -377,6 +377,10 @@ class ShiftController extends Controller
             abort(403);
         }
 
+        if ($shift->sales()->exists()) {
+            return redirect()->back()->with('error', 'Shift tidak dapat dihapus karena terdapat transaksi penjualan yang tercatat pada shift ini.');
+        }
+
         DB::transaction(function () use ($shift) {
             // Find and delete corresponding attendance
             $attendance = Attendance::where('user_id', $shift->user_id)

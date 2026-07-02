@@ -334,7 +334,8 @@ class SaleController extends Controller
         }
 
         DB::transaction(function () use ($request, $sale, $stock, $saleItem) {
-            $refundAmount = $saleItem->actual_sell_price - $request->input('restocking_fee');
+            $refundAmount = ($saleItem->actual_sell_price * $saleItem->qty) - $request->input('restocking_fee');
+            $refundAmount = max(0, $refundAmount);
 
             ReturnLog::create([
                 'sale_id' => $sale->id,

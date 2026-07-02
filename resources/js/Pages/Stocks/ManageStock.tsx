@@ -18,7 +18,9 @@ import {
     MessageCircle,
     Send,
     ExternalLink,
-    RotateCcw
+    RotateCcw,
+    Search,
+    Filter
 } from 'lucide-react';
 
 interface ParameterValue {
@@ -102,6 +104,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
     const [selectedStockDetail, setSelectedStockDetail] = useState<StockItem | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [categoryFilter, setCategoryFilter] = useState<string>('all');
+    const [showFilters, setShowFilters] = useState(false);
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({
         key: 'created_at',
         direction: 'desc'
@@ -494,57 +497,32 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
     return (
         <AuthenticatedLayout
             header={
-                <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 justify-end w-full">
+                <div className="flex items-stretch gap-2 justify-end w-full">
                         {!isAddingNewStock && !isEditingStock && (
-                            <div className="relative w-full sm:w-60">
+                            <div className="relative flex-1">
+                                <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-gray-400" />
                                 <input
                                     type="text"
                                     placeholder="Cari unit, SN, IMEI..."
                                     value={searchQuery}
                                     onChange={e => setSearchQuery(e.target.value)}
-                                    className="w-full rounded-xl border border-input bg-card px-4 py-2 text-sm font-bold text-foreground shadow-sm focus:border-indigo-500 focus:outline-none dark:bg-background"
+                                    className="w-full rounded-xl border border-input bg-card pl-10 pr-4 py-2 text-sm font-bold text-foreground shadow-sm focus:border-indigo-500 focus:outline-none dark:bg-background"
                                 />
                             </div>
                         )}
                         {!isAddingNewStock && !isEditingStock && (
-                            <select
-                                value={categoryFilter}
-                                onChange={e => setCategoryFilter(e.target.value)}
-                                className="rounded-xl border border-input bg-card px-4 py-2 text-sm font-bold text-foreground shadow-sm focus:border-indigo-500 focus:outline-none dark:bg-background"
+                            <button
+                                type="button"
+                                onClick={() => setShowFilters(!showFilters)}
+                                className={`flex items-center justify-center px-3 rounded-xl border transition shrink-0 ${
+                                    showFilters
+                                        ? 'bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900'
+                                        : 'bg-card dark:bg-background hover:bg-muted border-input text-foreground'
+                                }`}
                             >
-                                <option value="all">Semua Kategori</option>
-                                <option value="iphone">iPhone</option>
-                                <option value="android">Android</option>
-                                <option value="accessories">Aksesoris (Bulk)</option>
-                                <option value="extra">Add-On / Jasa</option>
-                            </select>
+                                <Filter className="h-4 w-4" />
+                            </button>
                         )}
-                        {isSuperAdmin && !isAddingNewStock && !isEditingStock && (
-                            <select
-                                value={trashFilter}
-                                onChange={(e) => setTrashFilter(e.target.value as any)}
-                                className="rounded-xl border border-input bg-card px-4 py-2 text-sm font-bold text-foreground shadow-sm focus:border-indigo-500 focus:outline-none dark:bg-background"
-                            >
-                                <option value="active">Unit Aktif</option>
-                                <option value="trash">Tempat Sampah (Trash)</option>
-                            </select>
-                        )}
-                        {isSuperAdmin && !isAddingNewStock && !isEditingStock && (
-                            <select
-                                value={storeFilterId}
-                                onChange={(e) => {
-                                    setStoreFilterId(e.target.value);
-                                    router.get(route('sale-data.index'), { store_id: e.target.value }, { preserveState: true });
-                                }}
-                                className="rounded-xl border border-input bg-card px-4 py-2 text-sm font-bold text-foreground shadow-sm focus:border-indigo-500 focus:outline-none dark:bg-background"
-                            >
-                                <option value="">Semua Cabang</option>
-                                {stores.map(s => (
-                                    <option key={s.id} value={s.id}>{s.name}</option>
-                                ))}
-                            </select>
-                        )}
-                        
                         {!isAddingNewStock && !isEditingStock ? (
                             <button
                                 onClick={() => setIsAddingNewStock(true)}
@@ -574,7 +552,59 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
 
                     {/* TAB 1: LIST STOCKS */}
                     {!isAddingNewStock && !isEditingStock ? (
-                        <div className="w-full flex flex-col lg:flex-row gap-6 items-stretch lg:items-start">
+                        <>
+                            {showFilters && (
+                                <div className="flex flex-wrap items-center gap-3 p-4 bg-card rounded-2xl border border-border shadow-sm mb-6 transition-all duration-300 w-full">
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full">
+                                        <div className="flex-1 min-w-[200px]">
+                                            <label className="block text-[10px] font-extrabold uppercase text-gray-400 mb-1">Kategori</label>
+                                            <select
+                                                value={categoryFilter}
+                                                onChange={e => setCategoryFilter(e.target.value)}
+                                                className="w-full rounded-xl border border-input bg-background px-3.5 py-2 text-xs font-bold text-foreground shadow-sm focus:border-indigo-500 focus:outline-none"
+                                            >
+                                                <option value="all">Semua Kategori</option>
+                                                <option value="iphone">iPhone</option>
+                                                <option value="android">Android</option>
+                                                <option value="accessories">Aksesoris (Bulk)</option>
+                                                <option value="extra">Add-On / Jasa</option>
+                                            </select>
+                                        </div>
+                                        {isSuperAdmin && (
+                                            <div className="flex-1 min-w-[200px]">
+                                                <label className="block text-[10px] font-extrabold uppercase text-gray-400 mb-1">Status Unit</label>
+                                                <select
+                                                    value={trashFilter}
+                                                    onChange={(e) => setTrashFilter(e.target.value as any)}
+                                                    className="w-full rounded-xl border border-input bg-background px-3.5 py-2 text-xs font-bold text-foreground shadow-sm focus:border-indigo-500 focus:outline-none"
+                                                >
+                                                    <option value="active">Unit Aktif</option>
+                                                    <option value="trash">Tempat Sampah (Trash)</option>
+                                                </select>
+                                            </div>
+                                        )}
+                                        {isSuperAdmin && (
+                                            <div className="flex-1 min-w-[200px]">
+                                                <label className="block text-[10px] font-extrabold uppercase text-gray-400 mb-1">Cabang</label>
+                                                <select
+                                                    value={storeFilterId}
+                                                    onChange={(e) => {
+                                                        setStoreFilterId(e.target.value);
+                                                        router.get(route('sale-data.index'), { store_id: e.target.value }, { preserveState: true });
+                                                    }}
+                                                    className="w-full rounded-xl border border-input bg-background px-3.5 py-2 text-xs font-bold text-foreground shadow-sm focus:border-indigo-500 focus:outline-none"
+                                                >
+                                                    <option value="">Semua Cabang</option>
+                                                    {stores.map(s => (
+                                                        <option key={s.id} value={s.id}>{s.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                            <div className="w-full flex flex-col lg:flex-row gap-6 items-stretch lg:items-start">
                                                {/* Table Column */}
                             <div className={`rounded-none sm:rounded-lg border-x-0 sm:border border-y sm:border-y-0 border-border bg-transparent sm:bg-card shadow-none sm:shadow-sm text-card-foreground -mx-4 sm:mx-0 w-[calc(100%+2rem)] sm:w-full transition-all duration-300 ${
                                 selectedStockDetail ? 'hidden lg:block lg:w-2/3' : ''
@@ -1127,9 +1157,10 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                             </div>
                                         </div>
                                     )}
-                                </div>
-                            )}
-                        </div>
+                                 </div>
+                             )}
+                         </div>
+                        </>
                     ) : isAddingNewStock ? (
                         <div className="rounded-none sm:rounded-lg border-x-0 sm:border border-y-0 sm:border-y bg-transparent sm:bg-card p-0 sm:p-6 shadow-none sm:shadow-sm text-card-foreground">
                             <h3 className="text-lg font-semibold text-foreground mb-6">Tambah Stok Unit Baru</h3>

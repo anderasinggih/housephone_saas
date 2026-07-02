@@ -75,15 +75,15 @@ export default function Authenticated({
         localStorage.setItem('theme', newTheme);
     };
 
-    const checkedInToday = (usePage().props.auth as any).checkedInToday;
+    const { checkedInToday, isClockedIn, isClockedOut } = (usePage().props.auth as any);
     const isKaryawan = user.role === 'karyawan';
-    const isKaryawanNotCheckedIn = isKaryawan && !checkedInToday;
+    const isKaryawanNotCheckedIn = isKaryawan && !isClockedIn;
 
     // Dynamic Navigation link classes using Shadcn UI theme variables
     const getLinkClass = (isActive: boolean) => {
         const base = "px-3 py-1.5 rounded-xl border border-transparent text-xs font-bold transition-all duration-200 flex items-center gap-1.5 ";
         if (isKaryawan) {
-            if (!checkedInToday) {
+            if (!isClockedIn) {
                 return base + (isActive 
                     ? "bg-rose-500/20 border-rose-500/40 text-rose-600 dark:text-rose-400 shadow-sm" 
                     : "text-rose-500/70 hover:bg-rose-500/10 hover:text-rose-600");
@@ -138,7 +138,7 @@ export default function Authenticated({
             {/* Top Navbar: Hidden on mobile, visible on desktop with Liquid Glass design */}
             <nav className={`hidden sm:block border-b sticky top-0 z-50 transition-all duration-300 ${
                 isKaryawan 
-                    ? !checkedInToday
+                    ? !isClockedIn
                         ? 'bg-rose-500/10 dark:bg-rose-950/20 border-rose-500/20 text-rose-600 dark:text-rose-400 backdrop-blur-xl shadow-sm'
                         : 'bg-emerald-500/10 dark:bg-emerald-950/20 border-emerald-500/20 text-emerald-600 dark:text-emerald-400 backdrop-blur-xl shadow-sm'
                     : 'border-white/20 dark:border-white/5 bg-background/60 backdrop-blur-xl shadow-[0_8px_32px_0_rgba(0,0,0,0.04)]'
@@ -150,7 +150,7 @@ export default function Authenticated({
                                 <Link href="/">
                                     <ApplicationLogo className={`block h-9 w-auto fill-current ${
                                         isKaryawan 
-                                            ? !checkedInToday 
+                                            ? !isClockedIn 
                                                 ? 'text-rose-600 dark:text-rose-400' 
                                                 : 'text-emerald-600 dark:text-emerald-400' 
                                             : 'text-primary'
@@ -339,7 +339,7 @@ export default function Authenticated({
             {/* Mobile Floating Bottom Navbar: Slim, Liquid Glass, & Rounded-full */}
             <div className={`sm:hidden fixed bottom-5 left-1/2 -translate-x-1/2 z-50 h-16 rounded-full border shadow-[0_8px_32px_0_rgba(0,0,0,0.08)] dark:shadow-[0_8px_32px_0_rgba(0,0,0,0.3)] flex items-center justify-between px-3 py-1 w-[94%] max-w-md transition-all duration-300 ${
                 isKaryawan 
-                    ? !checkedInToday
+                    ? !isClockedIn
                         ? 'bg-rose-500/10 dark:bg-rose-950/20 border-rose-500/20 text-rose-600 dark:text-rose-400 backdrop-blur-xl'
                         : 'bg-emerald-500/10 dark:bg-emerald-950/20 border-emerald-500/20 text-emerald-600 dark:text-emerald-400 backdrop-blur-xl'
                     : 'bg-background/60 backdrop-blur-xl border-white/20 dark:border-white/10'

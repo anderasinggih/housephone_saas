@@ -11,7 +11,7 @@
     --font-sans: 'Geist Variable', sans-serif
   }
   :root {
-    --background: oklch(0.98 0 0);
+    --background: oklch(0.955 0.003 240);
     --foreground: oklch(0.145 0 0);
     --card: oklch(1 0 0);
     --card-foreground: oklch(0.145 0 0);
@@ -21,13 +21,13 @@
     --primary-foreground: oklch(0.985 0 0);
     --secondary: oklch(0.95 0 0);
     --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.95 0 0);
-    --muted-foreground: oklch(0.45 0 0);
+    --muted: oklch(0.93 0 0);
+    --muted-foreground: oklch(0.4 0 0);
     --accent: oklch(0.95 0 0);
     --accent-foreground: oklch(0.205 0 0);
     --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.87 0 0);
-    --input: oklch(0.87 0 0);
+    --border: oklch(0.84 0.005 240);
+    --input: oklch(0.84 0.005 240);
     --ring: oklch(0.6 0 0);
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);

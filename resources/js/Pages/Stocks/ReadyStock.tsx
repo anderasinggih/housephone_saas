@@ -21,7 +21,8 @@ import {
     QrCode,
     MessageCircle,
     Send,
-    ExternalLink
+    ExternalLink,
+    Filter
 } from 'lucide-react';
 
 interface ParameterValue {
@@ -133,6 +134,7 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState<'all' | 'iphone' | 'android' | 'accessories' | 'extra'>('all');
     const [storeFilterId, setStoreFilterId] = useState(filters.store_id || '');
+    const [showFilters, setShowFilters] = useState(false);
 
     // Modals
     const [selectedStockDetail, setSelectedStockDetail] = useState<StockItem | null>(null);
@@ -405,6 +407,46 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
         }).format(cleanVal);
     };
 
+    const formatNumberInput = (val: string | number) => {
+        if (val === undefined || val === null || val === '') return '';
+        const num = val.toString().replace(/[^0-9]/g, '');
+        if (!num) return '';
+        return new Intl.NumberFormat('id-ID', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        }).format(Number(num));
+    };
+
+    const renderBadges = (item: StockItem) => {
+        return (
+            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                {item.category !== 'accessories' && item.category !== 'extra' && (
+                    <>
+                        {item.type === 'new' ? (
+                            <span className="inline-flex items-center gap-0.5 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-black text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                ✦ BARU
+                            </span>
+                        ) : (
+                            <span className="inline-flex items-center gap-0.5 rounded bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-black text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                                BEKAS
+                            </span>
+                        )}
+                    </>
+                )}
+                {item.memory?.value && (
+                    <span className="inline-flex items-center rounded bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 text-[9px] font-bold text-gray-600 dark:text-gray-400 border dark:border-gray-700">
+                        {item.memory.value}
+                    </span>
+                )}
+                {item.license?.value && (
+                    <span className="inline-flex items-center rounded bg-indigo-500/10 px-1.5 py-0.5 text-[9px] font-bold text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                        {item.license.value}
+                    </span>
+                )}
+            </div>
+        );
+    };
+
     // Select existing buyer
     const selectBuyer = (buyer: Buyer) => {
         checkoutForm.setData({
@@ -440,43 +482,10 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
             <div className="py-8">
                 <div className="mx-auto max-w-none px-4 sm:px-6 lg:px-8 space-y-8">
                     
-                    {/* Filter Row: Category Dropdown + Store Filter + Search */}
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                        <div className="flex items-center gap-2">
-                            {/* Category Dropdown */}
-                            <select
-                                value={activeTab}
-                                onChange={(e) => setActiveTab(e.target.value as any)}
-                                className="rounded-xl border border-input bg-background px-3.5 py-2.5 text-sm font-semibold text-foreground shadow-sm focus:border-indigo-500 focus:outline-none"
-                            >
-                                <option value="all">Semua Stok</option>
-                                <option value="iphone">iPhone</option>
-                                <option value="android">Android</option>
-                                <option value="accessories">Accessories</option>
-                                <option value="extra">Add-On / Jasa</option>
-                            </select>
-
-                            {/* Store Filter (superadmin only) */}
-                            {authUser.role === 'superadmin' && (
-                                <select
-                                    value={storeFilterId}
-                                    onChange={(e) => {
-                                        setStoreFilterId(e.target.value);
-                                        window.location.href = route('selling.index', { store_id: e.target.value });
-                                    }}
-                                    className="rounded-xl border border-input bg-background px-3.5 py-2.5 text-sm font-semibold text-foreground shadow-sm focus:border-indigo-500 focus:outline-none"
-                                >
-                                    <option value="">Semua Cabang</option>
-                                    {storesFilter.map(s => (
-                                        <option key={s.id} value={s.id}>{s.name}</option>
-                                    ))}
-                                </select>
-                            )}
-                        </div>
-
-                        {/* Search Input */}
+                    {/* Search & Actions Row */}
+                    <div className="flex items-stretch gap-2">
                         <div className="relative flex-1">
-                            <Search className="absolute left-3.5 top-3 h-4 w-4 text-gray-400" />
+                            <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-gray-400" />
                             <input
                                 id="search-ready-stock-input"
                                 type="text"
@@ -497,10 +506,62 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                         }
                                     }
                                 }}
-                                className="w-full rounded-xl border border-input bg-background pl-10 pr-4 py-2.5 text-sm font-bold text-foreground shadow-sm focus:border-indigo-500 focus:outline-none"
+                                className="w-full rounded-xl border border-input bg-card pl-10 pr-4 py-2.5 text-sm font-bold text-foreground shadow-sm focus:border-indigo-500 focus:outline-none dark:bg-background"
                             />
                         </div>
-                    </div>                    {/* Stock Table & Detail Split Panel */}
+                        <button
+                            type="button"
+                            onClick={() => setShowFilters(!showFilters)}
+                            className={`flex items-center justify-center px-3 rounded-xl border transition shrink-0 ${
+                                showFilters
+                                    ? 'bg-indigo-50 dark:bg-indigo-950/20 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900'
+                                    : 'bg-card dark:bg-background hover:bg-muted border-input text-foreground'
+                            }`}
+                        >
+                            <Filter className="h-4 w-4" />
+                        </button>
+                    </div>
+
+                    {/* Expandable Filter Panel */}
+                    {showFilters && (
+                        <div className="flex flex-wrap items-center gap-3 p-4 bg-card rounded-2xl border border-border shadow-sm transition-all duration-300">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full">
+                                <div className="flex-1 min-w-[200px]">
+                                    <label className="block text-[10px] font-extrabold uppercase text-gray-400 mb-1">Kategori</label>
+                                    <select
+                                        value={activeTab}
+                                        onChange={(e) => setActiveTab(e.target.value as any)}
+                                        className="w-full rounded-xl border border-input bg-background px-3.5 py-2 text-xs font-bold text-foreground shadow-sm focus:border-indigo-500 focus:outline-none"
+                                    >
+                                        <option value="all">Semua Stok</option>
+                                        <option value="iphone">iPhone</option>
+                                        <option value="android">Android</option>
+                                        <option value="accessories">Accessories</option>
+                                        <option value="extra">Add-On / Jasa</option>
+                                    </select>
+                                </div>
+
+                                {authUser.role === 'superadmin' && (
+                                    <div className="flex-1 min-w-[200px]">
+                                        <label className="block text-[10px] font-extrabold uppercase text-gray-400 mb-1">Cabang</label>
+                                        <select
+                                            value={storeFilterId}
+                                            onChange={(e) => {
+                                                setStoreFilterId(e.target.value);
+                                                window.location.href = route('selling.index', { store_id: e.target.value });
+                                            }}
+                                            className="w-full rounded-xl border border-input bg-background px-3.5 py-2 text-xs font-bold text-foreground shadow-sm focus:border-indigo-500 focus:outline-none"
+                                        >
+                                            <option value="">Semua Cabang</option>
+                                            {storesFilter.map(s => (
+                                                <option key={s.id} value={s.id}>{s.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}                    {/* Stock Table & Detail Split Panel */}
                     <div className="w-full grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                         
                         {/* Table Column */}
@@ -528,8 +589,9 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                                     <div className="flex justify-between items-start gap-3">
                                                         <div className="min-w-0 flex-1">
                                                             <p className="font-semibold text-foreground truncate block text-sm" title={item.name}>
-                                                                {item.name} {item.color?.value ? `${item.color.value}` : ''} {item.memory?.value ? `/ ${item.memory.value}` : ''}
+                                                                {item.name} {item.color?.value ? `(${item.color.value})` : ''}
                                                             </p>
+                                                            {renderBadges(item)}
                                                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-0.5 truncate">
                                                                 {item.category !== 'accessories' && item.category !== 'extra'
                                                                     ? `${item.serial_number || item.imei_1 || '-'} (${item.license?.value || item.supplier || 'N/A'})`
@@ -583,8 +645,9 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                                         >
                                                             <td className="py-2.5 px-4 text-left">
                                                                 <p className="font-semibold text-foreground truncate block max-w-xs" title={item.name}>
-                                                                    {item.name} {item.color?.value ? `${item.color.value}` : ''} {item.memory?.value ? `/ ${item.memory.value}` : ''}
+                                                                    {item.name} {item.color?.value ? `(${item.color.value})` : ''}
                                                                 </p>
+                                                                {renderBadges(item)}
                                                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-0.5 truncate max-w-xs">
                                                                     {item.category !== 'accessories' && item.category !== 'extra'
                                                                         ? `${item.serial_number || item.imei_1 || '-'} (${item.license?.value || item.supplier || 'N/A'})`
@@ -907,7 +970,7 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                             inputMode="numeric"
                                             pattern="[0-9]*"
                                             required
-                                            value={checkoutForm.data.items[0]?.actual_sell_price ?? ''}
+                                            value={formatNumberInput(checkoutForm.data.items[0]?.actual_sell_price ?? '')}
                                             onChange={e => {
                                                 const val = e.target.value.replace(/[^0-9]/g, '');
                                                 const items = [...checkoutForm.data.items];
@@ -955,7 +1018,7 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                             type="text"
                                             inputMode="numeric"
                                             pattern="[0-9]*"
-                                            value={checkoutForm.data.dp_amount ?? ''}
+                                            value={formatNumberInput(checkoutForm.data.dp_amount ?? '')}
                                             onChange={e => {
                                                 const val = e.target.value.replace(/[^0-9]/g, '');
                                                 checkoutForm.setData('dp_amount', val === '' ? '' : parseFloat(val));
@@ -994,7 +1057,7 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                             type="text"
                                             inputMode="numeric"
                                             pattern="[0-9]*"
-                                            value={checkoutForm.data.affiliate_fee ?? ''}
+                                            value={formatNumberInput(checkoutForm.data.affiliate_fee ?? '')}
                                             onChange={e => {
                                                 const val = e.target.value.replace(/[^0-9]/g, '');
                                                 checkoutForm.setData('affiliate_fee', val === '' ? '' : parseFloat(val));

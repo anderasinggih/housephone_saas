@@ -39,6 +39,18 @@ class HandleInertiaRequests extends Middleware
                         ->whereDate('clock_in', \Carbon\Carbon::today())
                         ->exists()
                     : false,
+                'isClockedIn' => $request->user()
+                    ? \App\Models\Attendance::where('user_id', $request->user()->id)
+                        ->whereDate('clock_in', \Carbon\Carbon::today())
+                        ->whereNull('clock_out')
+                        ->exists()
+                    : false,
+                'isClockedOut' => $request->user()
+                    ? \App\Models\Attendance::where('user_id', $request->user()->id)
+                        ->whereDate('clock_in', \Carbon\Carbon::today())
+                        ->whereNotNull('clock_out')
+                        ->exists()
+                    : false,
             ],
             'flash' => [
                 'success' => $request->session()->get('success'),

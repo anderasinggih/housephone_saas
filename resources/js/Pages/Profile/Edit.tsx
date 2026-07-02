@@ -277,63 +277,7 @@ export default function Edit({
                         </div>
                     )}
 
-                    {/* Delete Account — superadmin only */}
-                    {authUser.role === 'superadmin' && (
-                        <div className="rounded-xl border border-rose-200 dark:border-rose-900/50 bg-card p-6 shadow-sm text-card-foreground space-y-4">
-                            <div className="flex items-center gap-3 border-b border-rose-100 dark:border-rose-900 pb-4">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-rose-500/10 border border-rose-500/20">
-                                    <Trash2 className="h-5 w-5 text-rose-500" />
-                                </div>
-                                <div>
-                                    <h3 className="text-sm font-bold text-rose-600 dark:text-rose-400">Hapus Akun</h3>
-                                    <p className="text-xs text-muted-foreground">Tindakan permanen — tidak dapat dipulihkan.</p>
-                                </div>
-                            </div>
 
-                            {!showDeleteConfirm ? (
-                                <button
-                                    type="button"
-                                    onClick={() => setShowDeleteConfirm(true)}
-                                    className="rounded-xl border border-rose-300 dark:border-rose-800 px-5 py-2 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition"
-                                >
-                                    Hapus Akun Saya
-                                </button>
-                            ) : (
-                                <form onSubmit={submitDelete} className="space-y-4">
-                                    <p className="text-xs text-rose-600 dark:text-rose-400 font-semibold">
-                                        Masukkan password Anda untuk mengkonfirmasi penghapusan akun secara permanen.
-                                    </p>
-                                    <input
-                                        type="password"
-                                        required
-                                        value={deleteForm.data.password}
-                                        onChange={(e) => deleteForm.setData('password', e.target.value)}
-                                        placeholder="Password Anda"
-                                        className="w-full rounded-xl border border-rose-300 dark:border-rose-800 bg-background px-3.5 py-2 text-sm font-bold text-foreground focus:outline-none"
-                                    />
-                                    {deleteForm.errors.password && (
-                                        <p className="text-xs text-rose-500">{deleteForm.errors.password}</p>
-                                    )}
-                                    <div className="flex gap-3">
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowDeleteConfirm(false)}
-                                            className="flex-1 rounded-xl border border-input py-2 text-xs font-bold text-gray-500 hover:bg-muted transition"
-                                        >
-                                            Batal
-                                        </button>
-                                        <button
-                                            type="submit"
-                                            disabled={deleteForm.processing}
-                                            className="flex-1 rounded-xl bg-rose-600 py-2 text-xs font-bold text-white hover:bg-rose-700 transition"
-                                        >
-                                            {deleteForm.processing ? 'Menghapus...' : 'Hapus Permanen'}
-                                        </button>
-                                    </div>
-                                </form>
-                            )}
-                        </div>
-                    )}
 
                 </div>
             </div>
