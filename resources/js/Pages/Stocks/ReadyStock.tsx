@@ -418,12 +418,18 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
 
     const formatNumberInput = (val: string | number) => {
         if (val === undefined || val === null || val === '') return '';
-        const num = val.toString().replace(/[^0-9]/g, '');
-        if (!num) return '';
+        // Strip everything except digits — handles both raw numbers and already-formatted strings
+        const digits = val.toString().replace(/[^0-9]/g, '');
+        if (!digits) return '';
         return new Intl.NumberFormat('id-ID', {
             minimumFractionDigits: 0,
             maximumFractionDigits: 0
-        }).format(Number(num));
+        }).format(Number(digits));
+    };
+
+    // Parse a potentially-formatted string ("7.000.000") or raw string ("7000000") to a clean number
+    const parseFormattedNumber = (val: string): string => {
+        return val.replace(/[^0-9]/g, '');
     };
 
     const renderBadges = (item: StockItem) => {
@@ -995,9 +1001,9 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                             required
                                             value={formatNumberInput(checkoutForm.data.items[0]?.actual_sell_price ?? '')}
                                             onChange={e => {
-                                                const val = e.target.value.replace(/[^0-9]/g, '');
+                                                const raw = parseFormattedNumber(e.target.value);
                                                 const items = [...checkoutForm.data.items];
-                                                items[0].actual_sell_price = val === '' ? '' : parseFloat(val);
+                                                items[0].actual_sell_price = raw === '' ? '' : raw;
                                                 checkoutForm.setData('items', items);
                                             }}
                                             className={`w-full rounded-xl border px-3.5 py-2 text-sm font-bold bg-card text-gray-800 dark:bg-background dark:text-gray-100 focus:outline-none ${checkoutForm.errors['items.0.actual_sell_price'] ? 'border-rose-400' : 'border-input dark:border-input'}`}
@@ -1043,8 +1049,8 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                             pattern="[0-9]*"
                                             value={formatNumberInput(checkoutForm.data.dp_amount ?? '')}
                                             onChange={e => {
-                                                const val = e.target.value.replace(/[^0-9]/g, '');
-                                                checkoutForm.setData('dp_amount', val === '' ? '' : parseFloat(val));
+                                                const raw = parseFormattedNumber(e.target.value);
+                                                checkoutForm.setData('dp_amount', raw);
                                             }}
                                             className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold text-gray-800 dark:border-input dark:bg-background dark:text-gray-100"
                                             placeholder="0"
@@ -1082,8 +1088,8 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                             pattern="[0-9]*"
                                             value={formatNumberInput(checkoutForm.data.affiliate_fee ?? '')}
                                             onChange={e => {
-                                                const val = e.target.value.replace(/[^0-9]/g, '');
-                                                checkoutForm.setData('affiliate_fee', val === '' ? '' : parseFloat(val));
+                                                const raw = parseFormattedNumber(e.target.value);
+                                                checkoutForm.setData('affiliate_fee', raw);
                                             }}
                                             className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold text-gray-800 dark:border-input dark:bg-background dark:text-gray-100"
                                             placeholder="Nominal komisi"
