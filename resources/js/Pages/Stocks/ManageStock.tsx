@@ -201,6 +201,13 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
             return aStatusOrder - bStatusOrder;
         }
 
+        // If sorting sold items and the user has not clicked a custom sort header, sort by sold_date desc
+        if (a.status === 'sold' && b.status === 'sold' && sortConfig.key === 'created_at') {
+            const aSoldDate = Number(getSortValue(a, 'sold_date'));
+            const bSoldDate = Number(getSortValue(b, 'sold_date'));
+            return bSoldDate - aSoldDate; // Newest sold first
+        }
+
         const aVal = getSortValue(a, sortConfig.key);
         const bVal = getSortValue(b, sortConfig.key);
 

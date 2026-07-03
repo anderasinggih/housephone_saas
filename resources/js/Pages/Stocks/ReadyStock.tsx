@@ -240,7 +240,7 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
             affiliate_user_id: '',
             affiliate_fee: '',
             transaction_date: getLocalDateTimeString(),
-            items: [{ stock_id: stock.id, qty: 1, actual_sell_price: stock.sell_price.toString() }],
+            items: [{ stock_id: stock.id, qty: 1, actual_sell_price: stock.sell_price }],
             trade_in: null,
             extras: availableExtras,
         });
@@ -995,18 +995,18 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                     <div>
                                         <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Harga Kesepakatan (Nego)</label>
                                         <input
-                                            type="text"
-                                            inputMode="numeric"
-                                            pattern="[0-9]*"
+                                            type="number"
                                             required
-                                            value={formatNumberInput(checkoutForm.data.items[0]?.actual_sell_price ?? '')}
+                                            min={0}
+                                            value={checkoutForm.data.items[0]?.actual_sell_price ?? ''}
                                             onChange={e => {
-                                                const raw = parseFormattedNumber(e.target.value);
+                                                const val = e.target.value;
                                                 const items = [...checkoutForm.data.items];
-                                                items[0].actual_sell_price = raw === '' ? '' : raw;
+                                                items[0].actual_sell_price = val === '' ? '' : Number(val);
                                                 checkoutForm.setData('items', items);
                                             }}
-                                            className={`w-full rounded-xl border px-3.5 py-2 text-sm font-bold bg-card text-gray-800 dark:bg-background dark:text-gray-100 focus:outline-none ${checkoutForm.errors['items.0.actual_sell_price'] ? 'border-rose-400' : 'border-input dark:border-input'}`}
+                                            onWheel={e => e.currentTarget.blur()}
+                                            className={`w-full rounded-xl border px-3.5 py-2 text-sm font-bold bg-card text-gray-800 dark:bg-background dark:text-gray-100 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${checkoutForm.errors['items.0.actual_sell_price'] ? 'border-rose-400' : 'border-input dark:border-input'}`}
                                             placeholder="Masukkan harga"
                                         />
                                         <p className="text-[10px] text-gray-400 mt-1 font-bold">Default retail: {formatCurrency(selectedStock.sell_price)}</p>
@@ -1044,15 +1044,15 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                     <div>
                                         <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Uang Muka / DP Booking (Opsional)</label>
                                         <input
-                                            type="text"
-                                            inputMode="numeric"
-                                            pattern="[0-9]*"
-                                            value={formatNumberInput(checkoutForm.data.dp_amount ?? '')}
+                                            type="number"
+                                            min={0}
+                                            value={checkoutForm.data.dp_amount ?? ''}
                                             onChange={e => {
-                                                const raw = parseFormattedNumber(e.target.value);
-                                                checkoutForm.setData('dp_amount', raw);
+                                                const val = e.target.value;
+                                                checkoutForm.setData('dp_amount', val === '' ? '' : Number(val));
                                             }}
-                                            className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold text-gray-800 dark:border-input dark:bg-background dark:text-gray-100"
+                                            onWheel={e => e.currentTarget.blur()}
+                                            className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold text-gray-800 dark:border-input dark:bg-background dark:text-gray-100 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                             placeholder="0"
                                         />
                                     </div>
@@ -1083,15 +1083,15 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                     <div>
                                         <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">Komisi Affiliate</label>
                                         <input
-                                            type="text"
-                                            inputMode="numeric"
-                                            pattern="[0-9]*"
-                                            value={formatNumberInput(checkoutForm.data.affiliate_fee ?? '')}
+                                            type="number"
+                                            min={0}
+                                            value={checkoutForm.data.affiliate_fee ?? ''}
                                             onChange={e => {
-                                                const raw = parseFormattedNumber(e.target.value);
-                                                checkoutForm.setData('affiliate_fee', raw);
+                                                const val = e.target.value;
+                                                checkoutForm.setData('affiliate_fee', val === '' ? '' : Number(val));
                                             }}
-                                            className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold text-gray-800 dark:border-input dark:bg-background dark:text-gray-100"
+                                            onWheel={e => e.currentTarget.blur()}
+                                            className="w-full rounded-xl border border-input bg-card px-3.5 py-2 text-sm font-bold text-gray-800 dark:border-input dark:bg-background dark:text-gray-100 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                             placeholder="Nominal komisi"
                                         />
                                     </div>
@@ -1182,7 +1182,8 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
                                                         const ti = checkoutForm.data.trade_in!;
                                                         checkoutForm.setData('trade_in', { ...ti, buy_price: e.target.value === '' ? '' : parseFloat(e.target.value) });
                                                     }}
-                                                    className="w-full rounded-xl border border-input bg-card px-3 py-2 text-sm font-bold text-gray-800 dark:border-input dark:bg-background"
+                                                    onWheel={e => e.currentTarget.blur()}
+                                                    className="w-full rounded-xl border border-input bg-card px-3 py-2 text-sm font-bold text-gray-800 dark:border-input dark:bg-background [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                     placeholder="Nilai taksiran"
                                                 />
                                             </div>
