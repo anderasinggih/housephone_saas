@@ -240,7 +240,7 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
             affiliate_user_id: '',
             affiliate_fee: '',
             transaction_date: getLocalDateTimeString(),
-            items: [{ stock_id: stock.id, qty: 1, actual_sell_price: stock.sell_price }],
+            items: [{ stock_id: stock.id, qty: 1, actual_sell_price: stock.sell_price.toString() }],
             trade_in: null,
             extras: availableExtras,
         });
