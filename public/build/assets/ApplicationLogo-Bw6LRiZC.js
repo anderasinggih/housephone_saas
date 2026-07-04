@@ -1,0 +1,1 @@
+import{j as n}from"./app-BJ3AY77s.js";function e({className:t="",...o}){const i=!t.includes("text-white");return n.jsx("img",{src:"/favicon.ico",alt:"Logo",className:`${t} ${i?"dark:invert-0 invert":""}`,...o})}export{e as A};
