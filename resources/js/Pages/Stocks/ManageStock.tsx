@@ -768,13 +768,18 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                     const sellPrice = item.sell_price ? parseFloat(item.sell_price as any) : 0;
                                                     const actualSellPrice = (item.status === 'sold' && saleItem?.actual_sell_price) ? parseFloat(saleItem.actual_sell_price as any) : 0;
                                                     const actualAffiliateFee = (item.status === 'sold' && sale?.affiliate_fee) ? parseFloat(sale.affiliate_fee as any) : 0;
-                                                    const extrasBuyer = (item.status === 'sold' && sale?.extras)
-                                                        ? sale.extras.reduce((acc, curr) => curr.charge_to === 'buyer' ? acc + parseFloat(curr.sell_price as any) : acc, 0)
+                                                    const extrasProfit = (item.status === 'sold' && sale?.extras)
+                                                        ? sale.extras.reduce((acc, curr) => {
+                                                            const sell = parseFloat(curr.sell_price as any) || 0;
+                                                            const buy = parseFloat(curr.buy_price as any) || 0;
+                                                            if (curr.charge_to === 'buyer') {
+                                                                return acc + (sell - buy);
+                                                            } else {
+                                                                return acc - buy;
+                                                            }
+                                                        }, 0)
                                                         : 0;
-                                                    const extrasCost = (item.status === 'sold' && sale?.extras)
-                                                        ? sale.extras.reduce((acc, curr) => curr.charge_to === 'seller' ? acc + parseFloat(curr.buy_price as any) : acc, 0)
-                                                        : 0;
-                                                    const actualProfit = actualSellPrice > 0 ? (actualSellPrice + extrasBuyer - buyPrice - actualAffiliateFee - extrasCost) : 0;
+                                                    const actualProfit = actualSellPrice > 0 ? (actualSellPrice - buyPrice - actualAffiliateFee + extrasProfit) : 0;
  
                                                     const soldIn = (item.status === 'sold' && sale?.invoice_number) ? sale.invoice_number : '-';
                                                     const affiliatorName = (item.status === 'sold' && sale?.affiliate_user?.name) ? sale.affiliate_user.name : '-';
@@ -1079,13 +1084,18 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                 const actPrice = sItem.actual_sell_price ? parseFloat(sItem.actual_sell_price as any) : 0;
                                                 const affFee = sale?.affiliate_fee ? parseFloat(sale.affiliate_fee as any) : 0;
                                                 const buyPr = selectedStockDetail.buy_price ? parseFloat(selectedStockDetail.buy_price as any) : 0;
-                                                const extrasBuyer = sale?.extras
-                                                    ? sale.extras.reduce((acc, curr) => curr.charge_to === 'buyer' ? acc + parseFloat(curr.sell_price as any) : acc, 0)
+                                                const extrasProfit = sale?.extras
+                                                    ? sale.extras.reduce((acc, curr) => {
+                                                        const sell = parseFloat(curr.sell_price as any) || 0;
+                                                        const buy = parseFloat(curr.buy_price as any) || 0;
+                                                        if (curr.charge_to === 'buyer') {
+                                                            return acc + (sell - buy);
+                                                        } else {
+                                                            return acc - buy;
+                                                        }
+                                                    }, 0)
                                                     : 0;
-                                                const extrasCost = sale?.extras
-                                                    ? sale.extras.reduce((acc, curr) => curr.charge_to === 'seller' ? acc + parseFloat(curr.buy_price as any) : acc, 0)
-                                                    : 0;
-                                                const netProf = actPrice > 0 ? (actPrice + extrasBuyer - buyPr - affFee - extrasCost) : 0;
+                                                const netProf = actPrice > 0 ? (actPrice - buyPr - affFee + extrasProfit) : 0;
                                                 const buyerPhone = (sale?.buyer as any)?.phone || '';
                                                 const buyerName = sale?.buyer?.name || '';
                                                 const invoiceNumber = sale?.invoice_number || '';
