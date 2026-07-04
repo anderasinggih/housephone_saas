@@ -1052,7 +1052,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                             </span>
                                         </div>
 
-                                        {canSeeFinancials && (
+                                        {canSeeFinancials && selectedStockDetail.status !== 'sold' && (
                                             <div className="grid grid-cols-2 gap-2 border-b border-border/50 pb-2">
                                                 <span className="text-gray-400 uppercase text-[10px]">Ekspetasi Profit</span>
                                                 <span className="text-right font-bold text-emerald-600 dark:text-emerald-400">
