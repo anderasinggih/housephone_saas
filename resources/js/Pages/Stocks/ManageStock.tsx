@@ -74,6 +74,8 @@ interface StockItem {
             affiliate_fee: string | number;
             buyer?: { id: number; name: string; phone?: string; };
             affiliate_user?: { id: number; name: string; };
+            extras?: Array<{ extra_id: number; charge_to: 'buyer' | 'seller' | 'free_promotion'; sell_price: string | number; buy_price: string | number; }>;
+            items?: Array<{ id: number; stock_id: number; qty: number; actual_sell_price: string | number; buy_price_snap: string | number; is_trade_in_item: boolean; }>;
         };
     }>;
 }
@@ -177,7 +179,13 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                 const buyPrice = item.buy_price ? parseFloat(item.buy_price as any) : 0;
                 const actualSellPrice = (item.status === 'sold' && saleItem?.actual_sell_price) ? parseFloat(saleItem.actual_sell_price as any) : 0;
                 const actualAffiliateFee = (item.status === 'sold' && sale?.affiliate_fee) ? parseFloat(sale.affiliate_fee as any) : 0;
-                return actualSellPrice > 0 ? (actualSellPrice - buyPrice - actualAffiliateFee) : 0;
+                const extrasBuyer = (item.status === 'sold' && sale?.extras)
+                    ? sale.extras.reduce((acc, curr) => curr.charge_to === 'buyer' ? acc + parseFloat(curr.sell_price as any) : acc, 0)
+                    : 0;
+                const extrasCost = (item.status === 'sold' && sale?.extras)
+                    ? sale.extras.reduce((acc, curr) => curr.charge_to === 'seller' ? acc + parseFloat(curr.buy_price as any) : acc, 0)
+                    : 0;
+                return actualSellPrice > 0 ? (actualSellPrice + extrasBuyer - buyPrice - actualAffiliateFee - extrasCost) : 0;
             }
             case 'sold_in':
                 return (item.status === 'sold' && sale?.invoice_number) ? sale.invoice_number : '';
@@ -755,7 +763,13 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                     const sellPrice = item.sell_price ? parseFloat(item.sell_price as any) : 0;
                                                     const actualSellPrice = (item.status === 'sold' && saleItem?.actual_sell_price) ? parseFloat(saleItem.actual_sell_price as any) : 0;
                                                     const actualAffiliateFee = (item.status === 'sold' && sale?.affiliate_fee) ? parseFloat(sale.affiliate_fee as any) : 0;
-                                                    const actualProfit = actualSellPrice > 0 ? (actualSellPrice - buyPrice - actualAffiliateFee) : 0;
+                                                    const extrasBuyer = (item.status === 'sold' && sale?.extras)
+                                                        ? sale.extras.reduce((acc, curr) => curr.charge_to === 'buyer' ? acc + parseFloat(curr.sell_price as any) : acc, 0)
+                                                        : 0;
+                                                    const extrasCost = (item.status === 'sold' && sale?.extras)
+                                                        ? sale.extras.reduce((acc, curr) => curr.charge_to === 'seller' ? acc + parseFloat(curr.buy_price as any) : acc, 0)
+                                                        : 0;
+                                                    const actualProfit = actualSellPrice > 0 ? (actualSellPrice + extrasBuyer - buyPrice - actualAffiliateFee - extrasCost) : 0;
  
                                                     const soldIn = (item.status === 'sold' && sale?.invoice_number) ? sale.invoice_number : '-';
                                                     const affiliatorName = (item.status === 'sold' && sale?.affiliate_user?.name) ? sale.affiliate_user.name : '-';
@@ -1049,7 +1063,6 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                             <span className="text-right text-foreground">{selectedStockDetail.warranty_duration_days} Hari</span>
                                         </div>
                                     </div>
-
                                     {/* Sale Info (If Sold) with WA buttons */}
                                     {selectedStockDetail.status === 'sold' && selectedStockDetail.sale_items?.[0] && (
                                         <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 space-y-3">
@@ -1061,7 +1074,13 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                 const actPrice = sItem.actual_sell_price ? parseFloat(sItem.actual_sell_price as any) : 0;
                                                 const affFee = sale?.affiliate_fee ? parseFloat(sale.affiliate_fee as any) : 0;
                                                 const buyPr = selectedStockDetail.buy_price ? parseFloat(selectedStockDetail.buy_price as any) : 0;
-                                                const netProf = actPrice > 0 ? (actPrice - buyPr - affFee) : 0;
+                                                const extrasBuyer = sale?.extras
+                                                    ? sale.extras.reduce((acc, curr) => curr.charge_to === 'buyer' ? acc + parseFloat(curr.sell_price as any) : acc, 0)
+                                                    : 0;
+                                                const extrasCost = sale?.extras
+                                                    ? sale.extras.reduce((acc, curr) => curr.charge_to === 'seller' ? acc + parseFloat(curr.buy_price as any) : acc, 0)
+                                                    : 0;
+                                                const netProf = actPrice > 0 ? (actPrice + extrasBuyer - buyPr - affFee - extrasCost) : 0;
                                                 const buyerPhone = (sale?.buyer as any)?.phone || '';
                                                 const buyerName = sale?.buyer?.name || '';
                                                 const invoiceNumber = sale?.invoice_number || '';
