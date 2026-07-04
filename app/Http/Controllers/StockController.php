@@ -85,7 +85,7 @@ class StockController extends Controller
             'license',
             'saleItems.sale.buyer',
             'saleItems.sale.affiliateUser',
-            'saleItems.sale.extras',
+            'saleItems.sale.extras.extra',
             'saleItems.sale.items'
         ])
         ->when($user->store_id, fn($q) => $q->where('store_id', $user->store_id))

@@ -74,7 +74,7 @@ interface StockItem {
             affiliate_fee: string | number;
             buyer?: { id: number; name: string; phone?: string; };
             affiliate_user?: { id: number; name: string; };
-            extras?: Array<{ extra_id: number; charge_to: 'buyer' | 'seller' | 'free_promotion'; sell_price: string | number; buy_price: string | number; }>;
+            extras?: Array<{ extra_id: number; charge_to: 'buyer' | 'seller' | 'free_promotion'; sell_price: string | number; buy_price: string | number; extra?: { name: string } }>;
             items?: Array<{ id: number; stock_id: number; qty: number; actual_sell_price: string | number; buy_price_snap: string | number; is_trade_in_item: boolean; }>;
         };
     }>;
@@ -1107,6 +1107,17 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                                     <span className="text-emerald-600">Harga Jual Real</span>
                                                                     <span className="text-emerald-600 font-bold">{formatCurrency(actPrice)}</span>
                                                                 </div>
+                                                                {sale?.extras && sale.extras.length > 0 && (
+                                                                    <div className="border-y border-emerald-500/10 py-1.5 my-1 space-y-1">
+                                                                        <span className="text-[10px] text-gray-400 block uppercase font-bold tracking-wider">Layanan Add-On</span>
+                                                                        {sale.extras.map((ex, exIdx) => (
+                                                                            <div key={exIdx} className="flex justify-between pl-2 text-[11px]">
+                                                                                <span className="text-gray-500">• {ex.extra?.name || 'Jasa Lainnya'} <span className="text-[9px] uppercase font-bold text-indigo-500">({ex.charge_to.replace('_', ' ')})</span></span>
+                                                                                <span className="text-foreground font-semibold">{formatCurrency(Number(ex.sell_price))}</span>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
                                                                 <div className="flex justify-between">
                                                                     <span className="text-amber-600">Komisi Afiliasi</span>
                                                                     <span className="text-amber-600 font-bold">{formatCurrency(affFee)}</span>
