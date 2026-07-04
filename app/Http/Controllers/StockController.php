@@ -370,6 +370,31 @@ class StockController extends Controller
             if ($stock->status === 'sold') {
                 $saleItem = \App\Models\SaleItem::where('stock_id', $stock->id)->first();
                 if ($saleItem && $sale = \App\Models\Sale::find($saleItem->sale_id)) {
+                    // Update HPP snap in sale item
+                    $saleItem->update([
+                        'buy_price_snap' => $stock->buy_price,
+                        'actual_sell_price' => $stock->sell_price
+                    ]);
+
+                    // Recalculate and update the sale's total_amount
+                    $itemsTotal = \App\Models\SaleItem::where('sale_id', $sale->id)
+                        ->where('is_trade_in_item', false)
+                        ->get()
+                        ->sum(fn($i) => $i->actual_sell_price * $i->qty);
+
+                    $tradeInTotal = \App\Models\SaleItem::where('sale_id', $sale->id)
+                        ->where('is_trade_in_item', true)
+                        ->get()
+                        ->sum(fn($i) => abs($i->actual_sell_price));
+
+                    $extrasTotal = $sale->extras()
+                        ->where('charge_to', 'buyer')
+                        ->get()
+                        ->sum('sell_price');
+
+                    $newFinalTotal = max(0, $itemsTotal + $extrasTotal - $tradeInTotal);
+                    $sale->update(['total_amount' => $newFinalTotal]);
+
                     if ($buyer = \App\Models\Buyer::find($sale->buyer_id)) {
                         $buyer->update([
                             'name' => $request->input('buyer_name') ?? $buyer->name,
