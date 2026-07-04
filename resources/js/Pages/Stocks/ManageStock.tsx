@@ -179,13 +179,18 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                 const buyPrice = item.buy_price ? parseFloat(item.buy_price as any) : 0;
                 const actualSellPrice = (item.status === 'sold' && saleItem?.actual_sell_price) ? parseFloat(saleItem.actual_sell_price as any) : 0;
                 const actualAffiliateFee = (item.status === 'sold' && sale?.affiliate_fee) ? parseFloat(sale.affiliate_fee as any) : 0;
-                const extrasBuyer = (item.status === 'sold' && sale?.extras)
-                    ? sale.extras.reduce((acc, curr) => curr.charge_to === 'buyer' ? acc + parseFloat(curr.sell_price as any) : acc, 0)
+                const extrasProfit = (item.status === 'sold' && sale?.extras)
+                    ? sale.extras.reduce((acc, curr) => {
+                        const sell = parseFloat(curr.sell_price as any) || 0;
+                        const buy = parseFloat(curr.buy_price as any) || 0;
+                        if (curr.charge_to === 'buyer') {
+                            return acc + (sell - buy);
+                        } else {
+                            return acc - buy;
+                        }
+                    }, 0)
                     : 0;
-                const extrasCost = (item.status === 'sold' && sale?.extras)
-                    ? sale.extras.reduce((acc, curr) => curr.charge_to === 'seller' ? acc + parseFloat(curr.buy_price as any) : acc, 0)
-                    : 0;
-                return actualSellPrice > 0 ? (actualSellPrice + extrasBuyer - buyPrice - actualAffiliateFee - extrasCost) : 0;
+                return actualSellPrice > 0 ? (actualSellPrice - buyPrice - actualAffiliateFee + extrasProfit) : 0;
             }
             case 'sold_in':
                 return (item.status === 'sold' && sale?.invoice_number) ? sale.invoice_number : '';
