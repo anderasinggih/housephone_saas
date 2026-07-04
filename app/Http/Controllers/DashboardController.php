@@ -82,7 +82,9 @@ class DashboardController extends Controller
             foreach ($sale->extras as $extra) {
                 if ($extra->charge_to === 'buyer') {
                     $saleRevenue += $extra->sell_price;
-                } elseif ($extra->charge_to === 'seller') {
+                    $saleHpp += $extra->buy_price;
+                } else {
+                    // seller or free_promotion
                     $saleHpp += $extra->buy_price;
                 }
             }
@@ -143,7 +145,9 @@ class DashboardController extends Controller
             foreach ($sale->extras as $extra) {
                 if ($extra->charge_to === 'buyer') {
                     $saleRevenue += $extra->sell_price;
-                } elseif ($extra->charge_to === 'seller') {
+                    $saleHpp += $extra->buy_price;
+                } else {
+                    // seller or free_promotion
                     $saleHpp += $extra->buy_price;
                 }
             }
@@ -322,7 +326,9 @@ class DashboardController extends Controller
                 foreach ($sale->extras as $extra) {
                     if ($extra->charge_to === 'buyer') {
                         $saleRevenue += $extra->sell_price;
-                    } elseif ($extra->charge_to === 'seller') {
+                        $saleHpp += $extra->buy_price;
+                    } else {
+                        // seller or free_promotion
                         $saleHpp += $extra->buy_price;
                     }
                 }
