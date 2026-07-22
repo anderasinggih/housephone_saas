@@ -596,7 +596,7 @@ export default function SalesHistory({ sales, affiliates, stores, filters }: Sal
                                                     {renderStatusBadge(sale)}
                                                 </div>
                                                 <p className="text-xs text-gray-400 font-semibold">
-                                                    {sale.buyer?.name || 'Umum'} • {new Date(sale.created_at).toLocaleDateString('id-ID')}
+                                                    {sale.buyer?.name || 'Umum'} {sale.buyer?.phone ? `(${sale.buyer.phone})` : ''} • {new Date(sale.created_at).toLocaleDateString('id-ID')}
                                                 </p>
                                             </div>
                                             <div className="mt-1.5 sm:mt-0 text-right">
