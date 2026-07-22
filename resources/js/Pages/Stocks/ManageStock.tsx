@@ -138,7 +138,12 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
             (item.imei_1 && item.imei_1.includes(searchQuery)) ||
             (item.color?.value && item.color.value.toLowerCase().includes(searchQuery.toLowerCase())) ||
             (item.brand?.value && item.brand.value.toLowerCase().includes(searchQuery.toLowerCase())) ||
-            (item.store?.name && item.store.name.toLowerCase().includes(searchQuery.toLowerCase()));
+            (item.store?.name && item.store.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+            (item.sale_items && item.sale_items.some(si => 
+                (si.sale?.buyer?.name && si.sale.buyer.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                (si.sale?.buyer?.phone && si.sale.buyer.phone.includes(searchQuery)) ||
+                (si.sale?.invoice_number && si.sale.invoice_number.toLowerCase().includes(searchQuery.toLowerCase()))
+            ));
         return matchesSearch;
     });
 
@@ -541,7 +546,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                 <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-gray-400" />
                                 <input
                                     type="text"
-                                    placeholder="Cari unit, SN, IMEI..."
+                                    placeholder="Cari unit, SN, IMEI, buyer, no HP..."
                                     value={searchQuery}
                                     onChange={e => setSearchQuery(e.target.value)}
                                     className="w-full rounded-xl border border-input bg-card pl-10 pr-4 py-2 text-sm font-bold text-foreground shadow-sm focus:border-indigo-500 focus:outline-none dark:bg-background"
