@@ -95,20 +95,62 @@ class ShiftController extends Controller
         // Get active store if assigned
         $myStore = Store::find($user->store_id);
 
-        // Fetch attendance statistics per month
+        // Aggregate attendance statistics directly from computed shifts to guarantee 100% synchronization
         if (in_array($user->role, ['superadmin', 'viewer'])) {
-            $attendanceStats = Attendance::with('user')
-                ->whereMonth('clock_in', $selectedMonth)
-                ->whereYear('clock_in', $selectedYear)
-                ->select('user_id', DB::raw('count(id) as total_days'), DB::raw('sum(late_minutes) as total_late_minutes'), DB::raw('sum(work_minutes) as total_work_minutes'))
-                ->groupBy('user_id')
-                ->get();
+            $attendanceStats = $employees->map(function($emp) use ($shifts, $selectedMonth, $selectedYear) {
+                $userShifts = $shifts->filter(function($sh) use ($emp, $selectedMonth, $selectedYear) {
+                    $d = \Carbon\Carbon::parse($sh->opened_at);
+                    return (int)$sh->user_id === (int)$emp->id && $d->month == $selectedMonth && $d->year == $selectedYear;
+                });
+
+                $totalDays = $userShifts->count();
+                $totalLateMins = $userShifts->sum('late_minutes');
+                $totalWorkMins = 0;
+
+                foreach ($userShifts as $sh) {
+                    if ($sh->closed_at) {
+                        $start = \Carbon\Carbon::parse($sh->opened_at);
+                        $end = \Carbon\Carbon::parse($sh->closed_at);
+                        if ($end->gt($start)) {
+                            $totalWorkMins += $start->diffInMinutes($end);
+                        }
+                    }
+                }
+
+                return [
+                    'user_id' => $emp->id,
+                    'total_days' => $totalDays,
+                    'total_late_minutes' => $totalLateMins,
+                    'total_work_minutes' => $totalWorkMins,
+                    'user' => $emp,
+                ];
+            })->filter(fn($stat) => $stat['total_days'] > 0)->values();
         } else {
-            $attendanceStats = Attendance::where('user_id', $user->id)
-                ->whereMonth('clock_in', $selectedMonth)
-                ->whereYear('clock_in', $selectedYear)
-                ->select(DB::raw('count(id) as total_days'), DB::raw('sum(late_minutes) as total_late_minutes'), DB::raw('sum(work_minutes) as total_work_minutes'))
-                ->first();
+            $userShifts = $shifts->filter(function($sh) use ($user, $selectedMonth, $selectedYear) {
+                $d = \Carbon\Carbon::parse($sh->opened_at);
+                return (int)$sh->user_id === (int)$user->id && $d->month == $selectedMonth && $d->year == $selectedYear;
+            });
+
+            $totalDays = $userShifts->count();
+            $totalLateMins = $userShifts->sum('late_minutes');
+            $totalWorkMins = 0;
+
+            foreach ($userShifts as $sh) {
+                if ($sh->closed_at) {
+                    $start = \Carbon\Carbon::parse($sh->opened_at);
+                    $end = \Carbon\Carbon::parse($sh->closed_at);
+                    if ($end->gt($start)) {
+                        $totalWorkMins += $start->diffInMinutes($end);
+                    }
+                }
+            }
+
+            $attendanceStats = [
+                'user_id' => $user->id,
+                'total_days' => $totalDays,
+                'total_late_minutes' => $totalLateMins,
+                'total_work_minutes' => $totalWorkMins,
+            ];
         }
 
         // Fetch payrolls for the selected month/year
