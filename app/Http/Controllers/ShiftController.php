@@ -137,6 +137,29 @@ class ShiftController extends Controller
         return redirect()->back()->with('success', 'Payroll slip gaji berhasil disimpan.');
     }
 
+    public function sendPayrollEmail(Request $request, \App\Models\Payroll $payroll): RedirectResponse
+    {
+        $user = $request->user();
+        if ($user->role !== 'superadmin') {
+            abort(403, 'Hanya Superadmin yang berhak mengirim email slip gaji.');
+        }
+
+        $payroll->load(['user.store']);
+        $employee = $payroll->user;
+
+        if (!$employee || empty($employee->email)) {
+            return redirect()->back()->with('error', 'Karyawan tidak memiliki alamat email yang valid.');
+        }
+
+        try {
+            \Illuminate\Support\Facades\Mail::to($employee->email)->send(new \App\Mail\PayrollSlipMail($payroll));
+            return redirect()->back()->with('success', "Slip gaji berhasil dikirim ke email {$employee->email}.");
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to send payroll slip email: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Gagal mengirim email: ' . $e->getMessage());
+        }
+    }
+
     public function clockIn(Request $request): RedirectResponse
     {
         $request->validate([

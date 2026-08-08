@@ -1066,9 +1066,23 @@ export default function ShiftAttendance({ activeShift, activeAttendance, myStore
                             <button
                                 type="button"
                                 onClick={() => setPrintingPayroll(null)}
-                                className="flex-1 rounded-xl border border-gray-300 py-2.5 text-xs font-bold text-gray-600 hover:bg-gray-100 transition"
+                                className="rounded-xl border border-gray-300 px-3 py-2.5 text-xs font-bold text-gray-600 hover:bg-gray-100 transition"
                             >
                                 Tutup
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (confirm(`Kirim slip gaji ini ke email ${printingPayroll.user?.name}?`)) {
+                                        router.post(route('shifts.payroll.send-email', printingPayroll.id), {}, {
+                                            onSuccess: () => alert('Slip Gaji berhasil dikirimkan ke email karyawan!'),
+                                            onError: (err) => alert('Gagal mengirim email. Pastikan email karyawan terdaftar.'),
+                                        });
+                                    }
+                                }}
+                                className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 transition flex items-center justify-center gap-1.5"
+                            >
+                                ✉️ Kirim Email
                             </button>
                             <button
                                 type="button"
