@@ -68,19 +68,36 @@ interface AttendanceStat {
     };
 }
 
+interface Payroll {
+    id: number;
+    user_id: number;
+    month: number;
+    year: number;
+    basic_salary: number;
+    commission: number;
+    allowance: number;
+    deductions: number;
+    net_salary: number;
+    notes: string | null;
+    created_at: string;
+    user?: { id: number; name: string };
+}
+
 interface ShiftAttendanceProps {
     activeShift: Shift | null;
     activeAttendance: Attendance | null;
     myStore: Store | null;
     shifts: Shift[];
     attendanceStats: AttendanceStat[] | AttendanceStat | null;
+    payrolls?: Payroll[];
+    employees?: Array<{ id: number; name: string; role: string }>;
     filters?: {
         month: number;
         year: number;
     };
 }
 
-export default function ShiftAttendance({ activeShift, activeAttendance, myStore, shifts, attendanceStats, filters }: ShiftAttendanceProps) {
+export default function ShiftAttendance({ activeShift, activeAttendance, myStore, shifts, attendanceStats, payrolls = [], employees = [], filters }: ShiftAttendanceProps) {
     const authUser = usePage().props.auth.user as any;
     const isSuperAdmin = authUser.role === 'superadmin';
     const isViewer = authUser.role === 'viewer';
@@ -120,6 +137,47 @@ export default function ShiftAttendance({ activeShift, activeAttendance, myStore
         opened_at: '',
         closed_at: '',
     });
+
+    // Payroll Slip Form & Modal States
+    const [isPayrollModalOpen, setIsPayrollModalOpen] = useState(false);
+    const [printingPayroll, setPrintingPayroll] = useState<Payroll | null>(null);
+    const payrollForm = useForm({
+        user_id: '',
+        month: filters?.month || (new Date().getMonth() + 1),
+        year: filters?.year || new Date().getFullYear(),
+        basic_salary: '' as string | number,
+        commission: '' as string | number,
+        allowance: '' as string | number,
+        deductions: '' as string | number,
+        notes: '',
+    });
+
+    const openPayrollModal = (userId?: number) => {
+        const targetUserId = userId ? String(userId) : (employees[0]?.id ? String(employees[0].id) : '');
+        const existing = payrolls.find(p => String(p.user_id) === targetUserId);
+        
+        payrollForm.setData({
+            user_id: targetUserId,
+            month: filters?.month || (new Date().getMonth() + 1),
+            year: filters?.year || new Date().getFullYear(),
+            basic_salary: existing ? existing.basic_salary : '',
+            commission: existing ? existing.commission : '',
+            allowance: existing ? existing.allowance : '',
+            deductions: existing ? existing.deductions : '',
+            notes: existing ? (existing.notes || '') : '',
+        });
+        setIsPayrollModalOpen(true);
+    };
+
+    const submitPayroll = (e: React.FormEvent) => {
+        e.preventDefault();
+        payrollForm.post(route('shifts.payroll.store'), {
+            onSuccess: () => {
+                setIsPayrollModalOpen(false);
+                alert('Slip Gaji Karyawan berhasil disimpan!');
+            }
+        });
+    };
 
     const startEdit = (sh: Shift) => {
         setEditingShift(sh);
@@ -500,24 +558,26 @@ export default function ShiftAttendance({ activeShift, activeAttendance, myStore
 
                         {canSeeAllShifts ? (
                             <div className="overflow-x-auto">
-                                <table className="w-full min-w-[600px] text-left border-collapse text-sm">
+                                <table className="w-full min-w-[700px] text-left border-collapse text-sm">
                                     <thead>
                                         <tr className="border-b border-border dark:border-input text-xs font-bold uppercase tracking-wider text-gray-400">
                                             <th className="pb-3 font-semibold">Nama Karyawan</th>
                                             <th className="pb-3 font-semibold text-center">Total Shift (Hari)</th>
                                             <th className="pb-3 font-semibold text-center">Total Keterlambatan</th>
                                             <th className="pb-3 font-semibold text-center">Total Jam Kerja</th>
+                                            {isSuperAdmin && <th className="pb-3 font-semibold text-right">Slip Gaji / Payroll</th>}
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300">
                                         {!attendanceStats || (Array.isArray(attendanceStats) && attendanceStats.length === 0) ? (
                                             <tr>
-                                                <td colSpan={4} className="py-6 text-center text-gray-400">Belum ada rekap absensi untuk bulan ini.</td>
+                                                <td colSpan={isSuperAdmin ? 5 : 4} className="py-6 text-center text-gray-400">Belum ada rekap absensi untuk bulan ini.</td>
                                             </tr>
                                         ) : (
                                             (Array.isArray(attendanceStats) ? attendanceStats : []).map((stat) => {
                                                 const lateMins = parseInt(stat.total_late_minutes as string, 10) || 0;
                                                 const workMins = parseInt(stat.total_work_minutes as string, 10) || 0;
+                                                const userPayroll = payrolls.find(p => p.user_id === stat.user_id);
                                                 
                                                 const formatMinutes = (mins: number) => {
                                                     if (mins <= 0) return '✦ Tepat Waktu';
@@ -545,6 +605,26 @@ export default function ShiftAttendance({ activeShift, activeAttendance, myStore
                                                             </span>
                                                         </td>
                                                         <td className="py-4 text-center text-xs font-bold text-foreground">{formatWorkTime(workMins)}</td>
+                                                        {isSuperAdmin && (
+                                                            <td className="py-4 text-right space-x-2">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => openPayrollModal(stat.user_id)}
+                                                                    className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 transition"
+                                                                >
+                                                                    {userPayroll ? 'Edit Gaji' : '+ Input Gaji'}
+                                                                </button>
+                                                                {userPayroll && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setPrintingPayroll(userPayroll)}
+                                                                        className="rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/20 px-3 py-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 transition"
+                                                                    >
+                                                                        Lihat Slip
+                                                                    </button>
+                                                                )}
+                                                            </td>
+                                                        )}
                                                     </tr>
                                                 );
                                             })
@@ -766,6 +846,220 @@ export default function ShiftAttendance({ activeShift, activeAttendance, myStore
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL INPUT PAYROLL / SLIP GAJI */}
+            {isPayrollModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="w-full max-w-lg rounded-2xl bg-card border border-border p-6 shadow-xl space-y-6">
+                        <div className="flex items-center justify-between border-b border-border pb-4">
+                            <h3 className="text-base font-bold text-foreground">
+                                Input Slip Gaji (Bulan {payrollForm.data.month}/{payrollForm.data.year})
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={() => setIsPayrollModalOpen(false)}
+                                className="text-muted-foreground hover:text-foreground text-sm font-bold"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <form onSubmit={submitPayroll} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-extrabold uppercase text-gray-400 mb-1">Pilih Karyawan</label>
+                                <select
+                                    required
+                                    value={payrollForm.data.user_id}
+                                    onChange={(e) => {
+                                        const uid = e.target.value;
+                                        const existing = payrolls.find(p => String(p.user_id) === uid);
+                                        payrollForm.setData(d => ({
+                                            ...d,
+                                            user_id: uid,
+                                            basic_salary: existing ? existing.basic_salary : '',
+                                            commission: existing ? existing.commission : '',
+                                            allowance: existing ? existing.allowance : '',
+                                            deductions: existing ? existing.deductions : '',
+                                            notes: existing ? (existing.notes || '') : '',
+                                        }));
+                                    }}
+                                    className="w-full rounded-xl border border-input bg-background px-3.5 py-2 text-xs font-bold text-foreground focus:border-indigo-500 focus:outline-none"
+                                >
+                                    <option value="">-- Pilih Karyawan --</option>
+                                    {employees.map(emp => (
+                                        <option key={emp.id} value={emp.id}>{emp.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-extrabold uppercase text-gray-400 mb-1">Gaji Pokok (IDR)</label>
+                                    <input
+                                        type="number"
+                                        required
+                                        min={0}
+                                        value={payrollForm.data.basic_salary}
+                                        onChange={e => payrollForm.setData('basic_salary', parseFloat(e.target.value) || '')}
+                                        className="w-full rounded-xl border border-input bg-background px-3.5 py-2 text-xs font-bold text-foreground focus:border-indigo-500 focus:outline-none"
+                                        placeholder="0"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-extrabold uppercase text-gray-400 mb-1">Komisi / Bonus (IDR)</label>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        value={payrollForm.data.commission}
+                                        onChange={e => payrollForm.setData('commission', parseFloat(e.target.value) || '')}
+                                        className="w-full rounded-xl border border-input bg-background px-3.5 py-2 text-xs font-bold text-foreground focus:border-indigo-500 focus:outline-none"
+                                        placeholder="0"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-extrabold uppercase text-gray-400 mb-1">Tunjangan (IDR)</label>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        value={payrollForm.data.allowance}
+                                        onChange={e => payrollForm.setData('allowance', parseFloat(e.target.value) || '')}
+                                        className="w-full rounded-xl border border-input bg-background px-3.5 py-2 text-xs font-bold text-foreground focus:border-indigo-500 focus:outline-none"
+                                        placeholder="0"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-extrabold uppercase text-rose-500 mb-1">Potongan / Denda (IDR)</label>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        value={payrollForm.data.deductions}
+                                        onChange={e => payrollForm.setData('deductions', parseFloat(e.target.value) || '')}
+                                        className="w-full rounded-xl border border-rose-300 dark:border-rose-800 bg-rose-50/50 dark:bg-rose-950/10 px-3.5 py-2 text-xs font-bold text-rose-600 focus:border-rose-500 focus:outline-none"
+                                        placeholder="0"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-extrabold uppercase text-gray-400 mb-1">Keterangan / Catatan Potongan</label>
+                                <textarea
+                                    value={payrollForm.data.notes}
+                                    onChange={e => payrollForm.setData('notes', e.target.value)}
+                                    rows={2}
+                                    className="w-full rounded-xl border border-input bg-background px-3.5 py-2 text-xs font-bold text-foreground focus:border-indigo-500 focus:outline-none"
+                                    placeholder="Contoh: Potongan keterlambatan / kasbon..."
+                                />
+                            </div>
+
+                            {/* Live Calculation Preview */}
+                            <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex justify-between items-center">
+                                <span className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400 uppercase">Estimasi Gaji Bersih</span>
+                                <span className="text-sm font-black text-indigo-600 dark:text-indigo-400">
+                                    {formatCurrency(
+                                        Math.max(0, 
+                                            (Number(payrollForm.data.basic_salary) || 0) + 
+                                            (Number(payrollForm.data.commission) || 0) + 
+                                            (Number(payrollForm.data.allowance) || 0) - 
+                                            (Number(payrollForm.data.deductions) || 0)
+                                        )
+                                    )}
+                                </span>
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsPayrollModalOpen(false)}
+                                    className="rounded-xl border border-input px-4 py-2 text-xs font-bold text-muted-foreground hover:bg-muted"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={payrollForm.processing}
+                                    className="rounded-xl bg-indigo-600 px-5 py-2 text-xs font-bold text-white hover:bg-indigo-700 transition"
+                                >
+                                    {payrollForm.processing ? 'Menyimpan...' : 'Simpan Slip Gaji'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL PRINTER / PREVIEW SLIP GAJI */}
+            {printingPayroll && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="w-full max-w-md rounded-2xl bg-white text-gray-900 p-6 shadow-2xl space-y-6">
+                        <div className="border-b border-gray-200 pb-4 text-center">
+                            <h2 className="text-lg font-black uppercase text-indigo-600 tracking-wider">SLIP GAJI KARYAWAN</h2>
+                            <p className="text-xs font-bold text-gray-500 mt-0.5">{myStore?.name || 'HOUSEPHONE SAAS'}</p>
+                            <p className="text-[10px] font-semibold text-gray-400 uppercase">Periode: Bulan {printingPayroll.month} / {printingPayroll.year}</p>
+                        </div>
+
+                        <div className="space-y-3 text-xs">
+                            <div className="flex justify-between border-b border-gray-100 pb-2">
+                                <span className="text-gray-500">Nama Karyawan</span>
+                                <span className="font-bold text-gray-900">{printingPayroll.user?.name || '-'}</span>
+                            </div>
+
+                            <div className="space-y-1.5 pt-1">
+                                <div className="flex justify-between">
+                                    <span className="text-gray-600">Gaji Pokok</span>
+                                    <span className="font-bold">{formatCurrency(Number(printingPayroll.basic_salary))}</span>
+                                </div>
+                                {Number(printingPayroll.commission) > 0 && (
+                                    <div className="flex justify-between text-emerald-600">
+                                        <span>Komisi / Bonus</span>
+                                        <span className="font-bold">+{formatCurrency(Number(printingPayroll.commission))}</span>
+                                    </div>
+                                )}
+                                {Number(printingPayroll.allowance) > 0 && (
+                                    <div className="flex justify-between text-emerald-600">
+                                        <span>Tunjangan</span>
+                                        <span className="font-bold">+{formatCurrency(Number(printingPayroll.allowance))}</span>
+                                    </div>
+                                )}
+                                {Number(printingPayroll.deductions) > 0 && (
+                                    <div className="flex justify-between text-rose-600">
+                                        <span>Potongan / Denda</span>
+                                        <span className="font-bold">-{formatCurrency(Number(printingPayroll.deductions))}</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {printingPayroll.notes && (
+                                <div className="p-3 rounded-lg bg-gray-50 border border-gray-200 text-[11px] text-gray-600">
+                                    <strong className="block text-gray-800 text-[10px] uppercase mb-0.5">Catatan:</strong>
+                                    {printingPayroll.notes}
+                                </div>
+                            )}
+
+                            <div className="flex justify-between items-center p-3 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-900 pt-3">
+                                <span className="font-black text-xs uppercase">TOTAL GAJI BERSIH (TAKE HOME PAY)</span>
+                                <span className="font-black text-base text-indigo-600">{formatCurrency(Number(printingPayroll.net_salary))}</span>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-2 pt-2">
+                            <button
+                                type="button"
+                                onClick={() => setPrintingPayroll(null)}
+                                className="flex-1 rounded-xl border border-gray-300 py-2.5 text-xs font-bold text-gray-600 hover:bg-gray-100 transition"
+                            >
+                                Tutup
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => window.print()}
+                                className="flex-1 rounded-xl bg-indigo-600 py-2.5 text-xs font-bold text-white hover:bg-indigo-700 transition"
+                            >
+                                Cetak Slip
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

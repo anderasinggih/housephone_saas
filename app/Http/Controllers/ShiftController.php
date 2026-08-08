@@ -64,6 +64,12 @@ class ShiftController extends Controller
                 ->first();
         }
 
+        // Fetch payrolls for the selected month/year
+        $payrolls = \App\Models\Payroll::with(['user', 'creator'])
+            ->where('month', $selectedMonth)
+            ->where('year', $selectedYear)
+            ->get();
+
         $generalSettings = \App\Models\GeneralSetting::first() ?? \App\Models\GeneralSetting::create();
         $employeeSchedules = \App\Models\EmployeeSchedule::with(['user', 'store'])->get();
         $stores = Store::all();
@@ -75,6 +81,7 @@ class ShiftController extends Controller
             'myStore' => $myStore,
             'shifts' => $shifts,
             'attendanceStats' => $attendanceStats,
+            'payrolls' => $payrolls,
             'generalSettings' => $generalSettings,
             'employeeSchedules' => $employeeSchedules,
             'stores' => $stores,
@@ -84,6 +91,50 @@ class ShiftController extends Controller
                 'year' => (int)$selectedYear,
             ]
         ]);
+    }
+
+    public function storePayroll(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        if ($user->role !== 'superadmin') {
+            abort(403, 'Hanya Superadmin yang berhak mengelola payroll.');
+        }
+
+        $validated = $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'month' => 'required|integer|between:1,12',
+            'year' => 'required|integer|min:2020',
+            'basic_salary' => 'required|numeric|min:0',
+            'commission' => 'nullable|numeric|min:0',
+            'allowance' => 'nullable|numeric|min:0',
+            'deductions' => 'nullable|numeric|min:0',
+            'notes' => 'nullable|string',
+        ]);
+
+        $basicSalary = (float)$validated['basic_salary'];
+        $commission = (float)($validated['commission'] ?? 0);
+        $allowance = (float)($validated['allowance'] ?? 0);
+        $deductions = (float)($validated['deductions'] ?? 0);
+        $netSalary = max(0, $basicSalary + $commission + $allowance - $deductions);
+
+        \App\Models\Payroll::updateOrCreate(
+            [
+                'user_id' => $validated['user_id'],
+                'month' => $validated['month'],
+                'year' => $validated['year'],
+            ],
+            [
+                'basic_salary' => $basicSalary,
+                'commission' => $commission,
+                'allowance' => $allowance,
+                'deductions' => $deductions,
+                'net_salary' => $netSalary,
+                'notes' => $validated['notes'] ?? null,
+                'created_by' => $user->id,
+            ]
+        );
+
+        return redirect()->back()->with('success', 'Payroll slip gaji berhasil disimpan.');
     }
 
     public function clockIn(Request $request): RedirectResponse
