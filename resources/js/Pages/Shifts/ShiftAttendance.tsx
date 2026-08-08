@@ -37,6 +37,8 @@ interface Shift {
     opened_at: string;
     closed_at: string | null;
     late_minutes?: number;
+    total_omset?: number;
+    total_profit?: number;
     store?: Store;
     user?: { name: string };
     petty_cash?: Array<{
@@ -682,8 +684,8 @@ export default function ShiftAttendance({ activeShift, activeAttendance, myStore
                                         <th className="pb-3 font-semibold">Tutup (Closed)</th>
                                         {canSeeAllShifts && (
                                             <>
-                                                <th className="pb-3 font-semibold">Modal Awal</th>
-                                                <th className="pb-3 font-semibold">Uang Akhir</th>
+                                                <th className="pb-3 font-semibold">Omset Penjualan</th>
+                                                <th className="pb-3 font-semibold">Profit Shift</th>
                                                 <th className="pb-3 font-semibold">Kas Kecil</th>
                                                 <th className="pb-3 font-semibold">Status</th>
                                                 {canManageShifts && <th className="pb-3 font-semibold text-right">Aksi</th>}
@@ -720,8 +722,8 @@ export default function ShiftAttendance({ activeShift, activeAttendance, myStore
                                                     <td className="py-4 text-xs">{sh.closed_at ? new Date(sh.closed_at).toLocaleString('id-ID') : '-'}</td>
                                                     {canSeeAllShifts && (
                                                         <>
-                                                            <td className="py-4 text-xs">{formatCurrency(sh.start_cash)}</td>
-                                                            <td className="py-4 text-xs">{sh.end_cash ? formatCurrency(sh.end_cash) : '-'}</td>
+                                                            <td className="py-4 text-xs font-bold text-indigo-600 dark:text-indigo-400">{formatCurrency(sh.total_omset || 0)}</td>
+                                                            <td className="py-4 text-xs font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(sh.total_profit || 0)}</td>
                                                             <td className="py-4 text-xs">
                                                                 {(() => {
                                                                     const pettyList = sh.petty_cash || [];

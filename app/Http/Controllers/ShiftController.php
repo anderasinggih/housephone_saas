@@ -64,7 +64,25 @@ class ShiftController extends Controller
                 }
             }
 
+            // Calculate omset and profit during this shift
+            $sales = \App\Models\Sale::with('items')->where('shift_id', $sh->id)->where('status', 'completed')->get();
+            $totalOmset = $sales->sum('total_amount');
+            $totalProfit = 0;
+            foreach ($sales as $saleItemObj) {
+                foreach ($saleItemObj->items as $item) {
+                    if (!$item->is_trade_in_item) {
+                        $sell = (float)$item->actual_sell_price * (int)$item->qty;
+                        $buy = (float)$item->buy_price_snap * (int)$item->qty;
+                        $totalProfit += ($sell - $buy);
+                    }
+                }
+                // Subtract affiliate fee if any
+                $totalProfit -= (float)($saleItemObj->affiliate_fee ?? 0);
+            }
+
             $sh->late_minutes = $lateMins;
+            $sh->total_omset = $totalOmset;
+            $sh->total_profit = $totalProfit;
             return $sh;
         });
 
