@@ -45,22 +45,28 @@ class ShiftController extends Controller
                 ->whereDate('clock_in', \Carbon\Carbon::parse($sh->opened_at)->toDateString())
                 ->first();
 
-            // Find matching schedule for user (cast user_id to int)
-            $sched = $employeeSchedules->first(fn($item) => (int)$item->user_id === (int)$sh->user_id);
-            $workStartStr = ($sched && !empty($sched->work_start_time)) ? $sched->work_start_time : $generalSettings->work_start_time;
+            // Find matching schedule for user (by user_id and store_id if available)
+            $sched = $employeeSchedules->first(function($item) use ($sh) {
+                return (int)$item->user_id === (int)$sh->user_id && (int)$item->store_id === (int)$sh->store_id;
+            }) ?? $employeeSchedules->first(fn($item) => (int)$item->user_id === (int)$sh->user_id);
+
+            $workStartStr = ($sched && !empty($sched->work_start_time)) ? $sched->work_start_time : ($generalSettings->work_start_time ?? '09:00:00');
             if (strlen($workStartStr) === 5) {
                 $workStartStr .= ':00';
             }
-            $graceMins = ($sched && !is_null($sched->grace_period_minutes)) ? (int)$sched->grace_period_minutes : (int)($generalSettings->grace_period_minutes ?? 0);
+
+            // Grace period tolerance
+            $graceMins = ($sched && !is_null($sched->grace_period_minutes)) ? (int)$sched->grace_period_minutes : (int)($generalSettings->grace_period_minutes ?? 15);
 
             $openedAt = \Carbon\Carbon::parse($sh->opened_at);
-            $workStartDateTime = \Carbon\Carbon::parse($openedAt->toDateString() . ' ' . $workStartStr);
+            $targetTime = \Carbon\Carbon::parse($openedAt->format('Y-m-d') . ' ' . $workStartStr);
 
             $lateMins = 0;
-            if ($openedAt->greaterThan($workStartDateTime)) {
-                $diffMins = $openedAt->diffInMinutes($workStartDateTime);
-                if ($diffMins > $graceMins) {
-                    $lateMins = $diffMins;
+            if ($openedAt->gt($targetTime)) {
+                $diffInSeconds = $openedAt->timestamp - $targetTime->timestamp;
+                $diffInMinutes = (int)ceil($diffInSeconds / 60);
+                if ($diffInMinutes > $graceMins) {
+                    $lateMins = $diffInMinutes;
                 }
             }
 
