@@ -29,8 +29,20 @@ class TimelineActivityMail extends Mailable
     public function envelope(): Envelope
     {
         $companyName = config('app.name', 'House Phone');
+        $actionName = $this->activityLog->action;
+        
+        $subjectMap = [
+            'shift_clock_in' => '🔔 Absen Masuk (Clock-In) Karyawan Baru',
+            'shift_clock_out' => '🔒 Absen Keluar (Clock-Out) Shift Kasir',
+            'sale_checkout' => '🛍️ Transaksi Penjualan Baru (Checkout)',
+            'sale_void' => '⚠️ Pembatalan Transaksi Penjualan (Void)',
+            'sale_return' => '🔄 Pengembalian Barang (Return)',
+        ];
+
+        $subjectText = $subjectMap[$actionName] ?? "Aktivitas: {$actionName}";
+
         return new Envelope(
-            subject: "[{$companyName} Activity] {$this->activityLog->action}",
+            subject: "[{$companyName}] {$subjectText}",
         );
     }
 

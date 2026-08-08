@@ -43,11 +43,19 @@ class ActivityLog extends Model
 
         try {
             $settings = \App\Models\GeneralSetting::first();
+            $emails = [];
+            
             if ($settings && !empty($settings->notification_emails)) {
                 $emails = array_filter(array_map('trim', explode(',', $settings->notification_emails)));
-                if (!empty($emails)) {
-                    \Illuminate\Support\Facades\Mail::to($emails)->send(new \App\Mail\TimelineActivityMail($log));
-                }
+            }
+            
+            // If no custom notification emails are specified, fallback to all superadmin users' emails
+            if (empty($emails)) {
+                $emails = \App\Models\User::where('role', 'superadmin')->pluck('email')->filter()->toArray();
+            }
+
+            if (!empty($emails)) {
+                \Illuminate\Support\Facades\Mail::to($emails)->send(new \App\Mail\TimelineActivityMail($log));
             }
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Failed to send timeline email notification: ' . $e->getMessage());
