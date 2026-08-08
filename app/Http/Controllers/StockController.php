@@ -360,13 +360,18 @@ class StockController extends Controller
             'buyer_address' => 'nullable|string|max:500',
             'remove_extra_ids' => 'nullable|array',
             'remove_extra_ids.*' => 'integer|exists:sale_extras,id',
+            'update_extras' => 'nullable|array',
+            'update_extras.*.extra_id' => 'required|exists:stocks,id',
+            'update_extras.*.charge_to' => 'required|in:buyer,seller,free_promotion',
+            'update_extras.*.sell_price' => 'required|numeric|min:0',
+            'update_extras.*.buy_price' => 'required|numeric|min:0',
         ]);
 
         $wasSold = $stock->status === 'sold';
         $oldValues = $stock->toArray();
 
         DB::transaction(function() use ($stock, $validated, $wasSold, $oldValues, $request) {
-            $stockFields = collect($validated)->except(['buyer_name', 'buyer_phone', 'buyer_address', 'remove_extra_ids'])->toArray();
+            $stockFields = collect($validated)->except(['buyer_name', 'buyer_phone', 'buyer_address', 'remove_extra_ids', 'update_extras'])->toArray();
             $stock->update($stockFields);
 
             if ($stock->status === 'sold') {
@@ -375,6 +380,20 @@ class StockController extends Controller
                     // Remove checked/selected extra add-ons if requested
                     if ($request->has('remove_extra_ids') && is_array($request->input('remove_extra_ids'))) {
                         $sale->extras()->whereIn('id', $request->input('remove_extra_ids'))->delete();
+                    }
+
+                    // Sync/Add updated extras if provided
+                    if ($request->has('update_extras') && is_array($request->input('update_extras'))) {
+                        // Delete remaining extras and replace with updated selection
+                        $sale->extras()->delete();
+                        foreach ($request->input('update_extras') as $extra) {
+                            $sale->extras()->create([
+                                'extra_id' => $extra['extra_id'],
+                                'charge_to' => $extra['charge_to'],
+                                'sell_price' => $extra['sell_price'],
+                                'buy_price' => $extra['buy_price'],
+                            ]);
+                        }
                     }
 
                     // Update HPP snap in sale item

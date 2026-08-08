@@ -369,11 +369,19 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
         buyer_phone: '',
         buyer_address: '',
         remove_extra_ids: [] as number[],
+        update_extras: [] as Array<{ extra_id: number; charge_to: 'buyer' | 'seller' | 'free_promotion'; sell_price: number; buy_price: number; name?: string }>
     });
 
     const openEditModal = (stock: StockItem) => {
         const sale = stock.sale_items?.[0]?.sale;
         const buyer = sale?.buyer as any;
+        const currentExtras = (sale?.extras || []).map(e => ({
+            extra_id: e.extra_id,
+            charge_to: e.charge_to,
+            sell_price: Number(e.sell_price) || 0,
+            buy_price: Number(e.buy_price) || 0,
+            name: e.extra?.name || 'Add-on'
+        }));
         editForm.setData({
             store_id: stock.store_id || '',
             category: stock.category || 'iphone',
@@ -397,6 +405,7 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
             buyer_phone: buyer?.phone || '',
             buyer_address: buyer?.address || '',
             remove_extra_ids: [],
+            update_extras: currentExtras
         });
         setIsEditingStock(true);
     };
@@ -1766,44 +1775,88 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                     </div>
                                 )}
 
-                                {editForm.data.status === 'sold' && selectedStockDetail?.sale_items?.[0]?.sale?.extras && selectedStockDetail.sale_items[0].sale.extras.length > 0 && (
+                                {editForm.data.status === 'sold' && (
                                     <div className="p-0 sm:p-4 rounded-none sm:rounded-xl border-0 sm:border border-transparent sm:border-border dark:sm:border-input bg-transparent sm:bg-muted/20 space-y-4">
-                                        <h4 className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">5. Kelola Add-On / Layanan Terjual</h4>
-                                        <p className="text-xs text-gray-500">Centang Add-On di bawah ini jika ingin **dihapus / dibatalkan** dari transaksi invoice ini. Total tagihan invoice akan dihitung ulang secara otomatis saat disimpan.</p>
+                                        <div className="flex items-center justify-between">
+                                            <h4 className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">5. Kelola Add-On / Layanan Terjual</h4>
+                                        </div>
+                                        <p className="text-xs text-gray-500">Anda dapat **mengubah skema biaya (Buyer/Toko/Free)**, **menambah Add-On baru**, atau **menghapus** Add-On dari transaksi ini. Total invoice & profit akan otomatis dihitung ulang.</p>
+                                        
+                                        {/* List of current extras */}
                                         <div className="space-y-2">
-                                            {selectedStockDetail.sale_items[0].sale.extras.map((ex) => {
-                                                const isMarkedForRemoval = editForm.data.remove_extra_ids.includes(ex.id);
-                                                return (
-                                                    <label
-                                                        key={ex.id}
-                                                        className={`flex items-center justify-between p-3 rounded-xl border transition cursor-pointer ${
-                                                            isMarkedForRemoval 
-                                                                ? 'bg-rose-50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800 line-through text-rose-500' 
-                                                                : 'bg-card border-border hover:bg-muted/50'
-                                                        }`}
-                                                    >
-                                                        <div className="flex items-center gap-3">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={isMarkedForRemoval}
-                                                                onChange={(e) => {
-                                                                    if (e.target.checked) {
-                                                                        editForm.setData('remove_extra_ids', [...editForm.data.remove_extra_ids, ex.id]);
-                                                                    } else {
-                                                                        editForm.setData('remove_extra_ids', editForm.data.remove_extra_ids.filter(id => id !== ex.id));
-                                                                    }
+                                            {editForm.data.update_extras.length === 0 ? (
+                                                <p className="text-xs text-gray-400 italic">Belum ada Add-on / Layanan pada transaksi ini.</p>
+                                            ) : (
+                                                editForm.data.update_extras.map((ex, exIdx) => (
+                                                    <div key={exIdx} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border border-border bg-card gap-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    const updated = editForm.data.update_extras.filter((_, idx) => idx !== exIdx);
+                                                                    editForm.setData('update_extras', updated);
                                                                 }}
-                                                                className="h-4 w-4 rounded border-gray-300 text-rose-600 focus:ring-rose-500"
-                                                            />
+                                                                className="rounded-lg p-1 text-rose-500 hover:bg-rose-500/10 transition"
+                                                                title="Hapus Add-on ini"
+                                                            >
+                                                                <Trash className="h-4 w-4" />
+                                                            </button>
                                                             <div>
-                                                                <span className="text-xs font-bold text-foreground">{ex.extra?.name || 'Jasa / Add-on'}</span>
-                                                                <span className="ml-2 text-[10px] uppercase font-extrabold text-indigo-500">({ex.charge_to.replace('_', ' ')})</span>
+                                                                <span className="text-xs font-bold text-foreground">{ex.name}</span>
+                                                                <p className="text-[10px] text-gray-400">{formatCurrency(ex.sell_price)}</p>
                                                             </div>
                                                         </div>
-                                                        <span className="text-xs font-bold text-foreground">{formatCurrency(Number(ex.sell_price))}</span>
-                                                    </label>
-                                                );
-                                            })}
+                                                        <select
+                                                            value={ex.charge_to}
+                                                            onChange={(e) => {
+                                                                const updated = editForm.data.update_extras.map((item, idx) => 
+                                                                    idx === exIdx ? { ...item, charge_to: e.target.value as any } : item
+                                                                );
+                                                                editForm.setData('update_extras', updated);
+                                                            }}
+                                                            className="rounded-lg border border-input bg-background px-2.5 py-1 text-xs font-bold text-foreground focus:border-indigo-500 focus:outline-none"
+                                                        >
+                                                            <option value="buyer">Buyer (Pembeli Bayar)</option>
+                                                            <option value="seller">Toko Tanggung (HPP)</option>
+                                                            <option value="free_promotion">Promosi Free (Gratis)</option>
+                                                        </select>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+
+                                        {/* Dropdown to Add New Add-on */}
+                                        <div className="pt-2">
+                                            <label className="block text-[10px] font-extrabold uppercase text-gray-400 mb-1">+ Tambah Add-On / Layanan Lainnya</label>
+                                            <select
+                                                value=""
+                                                onChange={(e) => {
+                                                    const selectedExtraId = parseInt(e.target.value);
+                                                    if (!selectedExtraId) return;
+                                                    const extraStock = stocks.find(s => s.id === selectedExtraId);
+                                                    if (extraStock) {
+                                                        const newItem = {
+                                                            extra_id: extraStock.id,
+                                                            charge_to: ((extraStock as any).default_charge_to || 'buyer') as any,
+                                                            sell_price: Number(extraStock.sell_price) || 0,
+                                                            buy_price: Number(extraStock.buy_price) || 0,
+                                                            name: extraStock.name
+                                                        };
+                                                        editForm.setData('update_extras', [...editForm.data.update_extras, newItem]);
+                                                    }
+                                                }}
+                                                className="w-full rounded-xl border border-input bg-background px-3.5 py-2 text-xs font-bold text-foreground shadow-sm focus:border-indigo-500 focus:outline-none"
+                                            >
+                                                <option value="">-- Pilih Add-on untuk Ditambahkan --</option>
+                                                {stocks
+                                                    .filter(s => s.category === 'extra' && s.status === 'available')
+                                                    .map(addon => (
+                                                        <option key={addon.id} value={addon.id}>
+                                                            + {addon.name} ({formatCurrency(addon.sell_price)})
+                                                        </option>
+                                                    ))
+                                                }
+                                            </select>
                                         </div>
                                     </div>
                                 )}
