@@ -45,26 +45,27 @@ class ShiftController extends Controller
                 ->whereDate('clock_in', \Carbon\Carbon::parse($sh->opened_at)->toDateString())
                 ->first();
 
-            if ($att && !is_null($att->late_minutes)) {
-                $sh->late_minutes = (int)$att->late_minutes;
-            } else {
-                // Compute dynamically if attendance record was created before schedule settings
-                $sched = $employeeSchedules->firstWhere('user_id', $sh->user_id);
-                $workStartStr = ($sched && $sched->work_start_time) ? $sched->work_start_time : $generalSettings->work_start_time;
-                $graceMins = ($sched && !is_null($sched->grace_period_minutes)) ? (int)$sched->grace_period_minutes : (int)$generalSettings->grace_period_minutes;
+            // Find matching schedule for user
+            $sched = $employeeSchedules->firstWhere('user_id', $sh->user_id);
+            $workStartStr = ($sched && $sched->work_start_time) ? $sched->work_start_time : $generalSettings->work_start_time;
+            $graceMins = ($sched && !is_null($sched->grace_period_minutes)) ? (int)$sched->grace_period_minutes : (int)($generalSettings->grace_period_minutes ?? 0);
 
-                $openedAt = \Carbon\Carbon::parse($sh->opened_at);
-                $workStartDateTime = \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $openedAt->toDateString() . ' ' . $workStartStr);
+            $openedAt = \Carbon\Carbon::parse($sh->opened_at);
+            $workStartDateTime = \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $openedAt->toDateString() . ' ' . $workStartStr);
 
-                $lateMins = 0;
-                if ($openedAt->greaterThan($workStartDateTime)) {
-                    $diffMins = $openedAt->diffInMinutes($workStartDateTime);
-                    if ($diffMins > $graceMins) {
-                        $lateMins = $diffMins;
-                    }
+            $lateMins = 0;
+            if ($openedAt->greaterThan($workStartDateTime)) {
+                $diffMins = $openedAt->diffInMinutes($workStartDateTime);
+                if ($diffMins > $graceMins) {
+                    $lateMins = $diffMins;
                 }
-                $sh->late_minutes = $lateMins;
             }
+
+            if ($lateMins === 0 && $att && (int)$att->late_minutes > 0) {
+                $lateMins = (int)$att->late_minutes;
+            }
+
+            $sh->late_minutes = $lateMins;
             return $sh;
         });
 
