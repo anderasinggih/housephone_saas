@@ -212,8 +212,8 @@ export default function General({ settings, schedules, employees, stores }: Gene
                                     <h3 className="text-base font-semibold text-foreground">Atur Jadwal Shift Karyawan</h3>
                                 </div>
 
-                                <form onSubmit={submitSchedule} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-                                    <div className="md:col-span-2">
+                                <form onSubmit={submitSchedule} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                                    <div className="md:col-span-1">
                                         <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Pilih Karyawan</label>
                                         <select 
                                             value={scheduleForm.data.user_id} 
@@ -243,20 +243,27 @@ export default function General({ settings, schedules, employees, stores }: Gene
                                         <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Jam Masuk (Opsional)</label>
                                         <input 
                                             type="time" 
-                                            step="1"
                                             value={scheduleForm.data.work_start_time}
                                             onChange={e => scheduleForm.setData('work_start_time', e.target.value)}
-                                            placeholder="Default"
                                             className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500"
                                         />
                                     </div>
                                     <div className="md:col-span-1">
+                                        <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Jam Pulang (Opsional)</label>
+                                        <input 
+                                            type="time" 
+                                            value={scheduleForm.data.work_end_time}
+                                            onChange={e => scheduleForm.setData('work_end_time', e.target.value)}
+                                            className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                        />
+                                    </div>
+                                    <div className="md:col-span-5 flex justify-end">
                                         <button 
                                             type="submit" 
                                             disabled={scheduleForm.processing}
-                                            className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition"
+                                            className="flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 transition"
                                         >
-                                            <Plus className="h-4 w-4" /> Tambah
+                                            <Plus className="h-4 w-4" /> Simpan Jadwal Shift Khusus
                                         </button>
                                     </div>
                                 </form>
