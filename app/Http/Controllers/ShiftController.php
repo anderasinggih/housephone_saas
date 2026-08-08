@@ -30,6 +30,8 @@ class ShiftController extends Controller
         $selectedMonth = $request->input('month', date('m'));
         $selectedYear = $request->input('year', date('Y'));
 
+        $employees = User::where('role', 'karyawan')->get();
+
         // Get past shifts with attendance
         $shifts = Shift::with(['store', 'user', 'pettyCash'])
             ->when(!in_array($user->role, ['superadmin', 'viewer']), fn($q) => $q->where('user_id', $user->id))
