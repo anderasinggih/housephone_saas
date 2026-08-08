@@ -205,7 +205,7 @@ export default function ReadyStock({ stocks, stores, transfers, storesFilter, pa
     // Handle Search filter
     const filteredStocks = stocks.filter((item) => {
         const matchesCategory = activeTab === 'all' 
-            ? (item.category !== 'extra' && item.category !== 'accessories') 
+            ? true 
             : item.category === activeTab;
         const matchesSearch = 
             item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

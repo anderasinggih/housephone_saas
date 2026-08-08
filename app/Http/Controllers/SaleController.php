@@ -128,11 +128,23 @@ class SaleController extends Controller
                 $stock = Stock::findOrFail($item['stock_id']);
                 
                 // Deduct inventory
+                $soldStockId = $stock->id;
                 if ($stock->category === 'accessories') {
                     if ($stock->qty < $item['qty']) {
                         throw new \Exception("Stok aksesoris '{$stock->name}' tidak mencukupi.");
                     }
                     $stock->decrement('qty', $item['qty']);
+                    
+                    // Create a separate sold stock record for tracking sold bulk items in Sale Data
+                    $soldStock = $stock->replicate();
+                    $soldStock->qty = $item['qty'];
+                    $soldStock->status = 'sold';
+                    $soldStock->serial_number = null;
+                    $soldStock->imei_1 = null;
+                    $soldStock->save();
+                    
+                    $soldStockId = $soldStock->id;
+
                     if ($stock->qty === 0) {
                         $stock->update(['status' => 'sold']);
                     }
@@ -142,7 +154,7 @@ class SaleController extends Controller
 
                 $totalAmount += $item['actual_sell_price'] * $item['qty'];
                 $itemsData[] = [
-                    'stock_id' => $stock->id,
+                    'stock_id' => $soldStockId,
                     'qty' => $item['qty'],
                     'actual_sell_price' => $item['actual_sell_price'],
                     'buy_price_snap' => $stock->buy_price,
