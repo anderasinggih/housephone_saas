@@ -45,8 +45,8 @@ class ShiftController extends Controller
                 ->whereDate('clock_in', \Carbon\Carbon::parse($sh->opened_at)->toDateString())
                 ->first();
 
-            // Find matching schedule for user
-            $sched = $employeeSchedules->firstWhere('user_id', $sh->user_id);
+            // Find matching schedule for user (cast user_id to int)
+            $sched = $employeeSchedules->first(fn($item) => (int)$item->user_id === (int)$sh->user_id);
             $workStartStr = ($sched && !empty($sched->work_start_time)) ? $sched->work_start_time : $generalSettings->work_start_time;
             if (strlen($workStartStr) === 5) {
                 $workStartStr .= ':00';
@@ -258,10 +258,13 @@ class ShiftController extends Controller
             ->first();
 
         $workStart = $schedule && $schedule->work_start_time ? $schedule->work_start_time : $settings->work_start_time;
+        if (strlen($workStart) === 5) {
+            $workStart .= ':00';
+        }
         $graceMinutes = $schedule && !is_null($schedule->grace_period_minutes) ? $schedule->grace_period_minutes : $settings->grace_period_minutes;
 
         $now = now();
-        $workStartDateTime = \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $now->toDateString() . ' ' . $workStart);
+        $workStartDateTime = \Carbon\Carbon::parse($now->toDateString() . ' ' . $workStart);
         
         $lateMinutes = 0;
         if ($now->greaterThan($workStartDateTime)) {
