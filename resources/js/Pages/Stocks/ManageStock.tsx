@@ -74,7 +74,7 @@ interface StockItem {
             affiliate_fee: string | number;
             buyer?: { id: number; name: string; phone?: string; };
             affiliate_user?: { id: number; name: string; };
-            extras?: Array<{ extra_id: number; charge_to: 'buyer' | 'seller' | 'free_promotion'; sell_price: string | number; buy_price: string | number; extra?: { name: string } }>;
+            extras?: Array<{ id: number; extra_id: number; charge_to: 'buyer' | 'seller' | 'free_promotion'; sell_price: string | number; buy_price: string | number; extra?: { name: string } }>;
             items?: Array<{ id: number; stock_id: number; qty: number; actual_sell_price: string | number; buy_price_snap: string | number; is_trade_in_item: boolean; }>;
         };
     }>;
@@ -367,7 +367,8 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
         default_charge_to: 'buyer' as 'buyer' | 'seller' | 'free_promotion',
         buyer_name: '',
         buyer_phone: '',
-        buyer_address: ''
+        buyer_address: '',
+        remove_extra_ids: [] as number[],
     });
 
     const openEditModal = (stock: StockItem) => {
@@ -394,7 +395,8 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
             default_charge_to: (stock as any).default_charge_to || 'buyer',
             buyer_name: buyer?.name || '',
             buyer_phone: buyer?.phone || '',
-            buyer_address: buyer?.address || ''
+            buyer_address: buyer?.address || '',
+            remove_extra_ids: [],
         });
         setIsEditingStock(true);
     };
@@ -1760,6 +1762,48 @@ export default function ManageStock({ stocks, stores, parameters, filters }: Man
                                                     rows={2}
                                                 />
                                             </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {editForm.data.status === 'sold' && selectedStockDetail?.sale_items?.[0]?.sale?.extras && selectedStockDetail.sale_items[0].sale.extras.length > 0 && (
+                                    <div className="p-0 sm:p-4 rounded-none sm:rounded-xl border-0 sm:border border-transparent sm:border-border dark:sm:border-input bg-transparent sm:bg-muted/20 space-y-4">
+                                        <h4 className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">5. Kelola Add-On / Layanan Terjual</h4>
+                                        <p className="text-xs text-gray-500">Centang Add-On di bawah ini jika ingin **dihapus / dibatalkan** dari transaksi invoice ini. Total tagihan invoice akan dihitung ulang secara otomatis saat disimpan.</p>
+                                        <div className="space-y-2">
+                                            {selectedStockDetail.sale_items[0].sale.extras.map((ex) => {
+                                                const isMarkedForRemoval = editForm.data.remove_extra_ids.includes(ex.id);
+                                                return (
+                                                    <label
+                                                        key={ex.id}
+                                                        className={`flex items-center justify-between p-3 rounded-xl border transition cursor-pointer ${
+                                                            isMarkedForRemoval 
+                                                                ? 'bg-rose-50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800 line-through text-rose-500' 
+                                                                : 'bg-card border-border hover:bg-muted/50'
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={isMarkedForRemoval}
+                                                                onChange={(e) => {
+                                                                    if (e.target.checked) {
+                                                                        editForm.setData('remove_extra_ids', [...editForm.data.remove_extra_ids, ex.id]);
+                                                                    } else {
+                                                                        editForm.setData('remove_extra_ids', editForm.data.remove_extra_ids.filter(id => id !== ex.id));
+                                                                    }
+                                                                }}
+                                                                className="h-4 w-4 rounded border-gray-300 text-rose-600 focus:ring-rose-500"
+                                                            />
+                                                            <div>
+                                                                <span className="text-xs font-bold text-foreground">{ex.extra?.name || 'Jasa / Add-on'}</span>
+                                                                <span className="ml-2 text-[10px] uppercase font-extrabold text-indigo-500">({ex.charge_to.replace('_', ' ')})</span>
+                                                            </div>
+                                                        </div>
+                                                        <span className="text-xs font-bold text-foreground">{formatCurrency(Number(ex.sell_price))}</span>
+                                                    </label>
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 )}

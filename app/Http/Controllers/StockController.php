@@ -358,18 +358,25 @@ class StockController extends Controller
             'buyer_name' => 'nullable|string|max:255',
             'buyer_phone' => 'nullable|string|max:50',
             'buyer_address' => 'nullable|string|max:500',
+            'remove_extra_ids' => 'nullable|array',
+            'remove_extra_ids.*' => 'integer|exists:sale_extras,id',
         ]);
 
         $wasSold = $stock->status === 'sold';
         $oldValues = $stock->toArray();
 
         DB::transaction(function() use ($stock, $validated, $wasSold, $oldValues, $request) {
-            $stockFields = collect($validated)->except(['buyer_name', 'buyer_phone', 'buyer_address'])->toArray();
+            $stockFields = collect($validated)->except(['buyer_name', 'buyer_phone', 'buyer_address', 'remove_extra_ids'])->toArray();
             $stock->update($stockFields);
 
             if ($stock->status === 'sold') {
                 $saleItem = \App\Models\SaleItem::where('stock_id', $stock->id)->first();
                 if ($saleItem && $sale = \App\Models\Sale::find($saleItem->sale_id)) {
+                    // Remove checked/selected extra add-ons if requested
+                    if ($request->has('remove_extra_ids') && is_array($request->input('remove_extra_ids'))) {
+                        $sale->extras()->whereIn('id', $request->input('remove_extra_ids'))->delete();
+                    }
+
                     // Update HPP snap in sale item
                     $saleItem->update([
                         'buy_price_snap' => $stock->buy_price,
