@@ -992,57 +992,39 @@ export default function ShiftAttendance({ activeShift, activeAttendance, myStore
 
             {/* MODAL PRINTER / PREVIEW SLIP GAJI */}
             {printingPayroll && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 print:p-0 print:static print:bg-white print:backdrop-none">
-                    <style>{`
-                        @media print {
-                            body * {
-                                visibility: hidden;
-                            }
-                            #printable-payroll-slip, #printable-payroll-slip * {
-                                visibility: visible;
-                            }
-                            #printable-payroll-slip {
-                                position: absolute;
-                                left: 0;
-                                top: 0;
-                                width: 100%;
-                                box-shadow: none !important;
-                                border: none !important;
-                            }
-                        }
-                    `}</style>
-                    <div id="printable-payroll-slip" className="w-full max-w-md rounded-2xl bg-white text-gray-900 p-6 shadow-2xl space-y-6 border border-gray-100">
-                        <div className="border-b border-gray-200 pb-4 text-center">
-                            <h2 className="text-lg font-black uppercase text-indigo-600 tracking-wider">SLIP GAJI KARYAWAN</h2>
-                            <p className="text-xs font-bold text-gray-500 mt-0.5">{myStore?.name || 'HOUSEPHONE SAAS'}</p>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="w-full max-w-md rounded-2xl bg-card border border-border text-card-foreground p-6 shadow-2xl space-y-6">
+                        <div className="border-b border-border pb-4 text-center">
+                            <h2 className="text-lg font-black uppercase text-indigo-600 dark:text-indigo-400 tracking-wider">SLIP GAJI KARYAWAN</h2>
+                            <p className="text-xs font-bold text-muted-foreground mt-0.5">{myStore?.name || 'HOUSEPHONE SAAS'}</p>
                             <p className="text-[10px] font-semibold text-gray-400 uppercase">Periode: Bulan {printingPayroll.month} / {printingPayroll.year}</p>
                         </div>
 
                         <div className="space-y-3 text-xs">
-                            <div className="flex justify-between border-b border-gray-100 pb-2">
-                                <span className="text-gray-500">Nama Karyawan</span>
-                                <span className="font-bold text-gray-900">{printingPayroll.user?.name || '-'}</span>
+                            <div className="flex justify-between border-b border-border pb-2">
+                                <span className="text-muted-foreground">Nama Karyawan</span>
+                                <span className="font-bold text-foreground">{printingPayroll.user?.name || '-'}</span>
                             </div>
 
                             <div className="space-y-1.5 pt-1">
                                 <div className="flex justify-between">
-                                    <span className="text-gray-600">Gaji Pokok</span>
-                                    <span className="font-bold">{formatCurrency(Number(printingPayroll.basic_salary))}</span>
+                                    <span className="text-muted-foreground">Gaji Pokok</span>
+                                    <span className="font-bold text-foreground">{formatCurrency(Number(printingPayroll.basic_salary))}</span>
                                 </div>
                                 {Number(printingPayroll.commission) > 0 && (
-                                    <div className="flex justify-between text-emerald-600">
+                                    <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
                                         <span>Komisi / Bonus</span>
                                         <span className="font-bold">+{formatCurrency(Number(printingPayroll.commission))}</span>
                                     </div>
                                 )}
                                 {Number(printingPayroll.allowance) > 0 && (
-                                    <div className="flex justify-between text-emerald-600">
+                                    <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
                                         <span>Tunjangan</span>
                                         <span className="font-bold">+{formatCurrency(Number(printingPayroll.allowance))}</span>
                                     </div>
                                 )}
                                 {Number(printingPayroll.deductions) > 0 && (
-                                    <div className="flex justify-between text-rose-600">
+                                    <div className="flex justify-between text-rose-600 dark:text-rose-400">
                                         <span>Potongan / Denda</span>
                                         <span className="font-bold">-{formatCurrency(Number(printingPayroll.deductions))}</span>
                                     </div>
@@ -1050,23 +1032,23 @@ export default function ShiftAttendance({ activeShift, activeAttendance, myStore
                             </div>
 
                             {printingPayroll.notes && (
-                                <div className="p-3 rounded-lg bg-gray-50 border border-gray-200 text-[11px] text-gray-600">
-                                    <strong className="block text-gray-800 text-[10px] uppercase mb-0.5">Catatan:</strong>
+                                <div className="p-3 rounded-lg bg-muted/40 border border-border text-[11px] text-muted-foreground">
+                                    <strong className="block text-foreground text-[10px] uppercase mb-0.5">Catatan:</strong>
                                     {printingPayroll.notes}
                                 </div>
                             )}
 
-                            <div className="flex justify-between items-center p-3 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-900 pt-3">
+                            <div className="flex justify-between items-center p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 pt-3">
                                 <span className="font-black text-xs uppercase">TOTAL GAJI BERSIH (TAKE HOME PAY)</span>
-                                <span className="font-black text-base text-indigo-600">{formatCurrency(Number(printingPayroll.net_salary))}</span>
+                                <span className="font-black text-base">{formatCurrency(Number(printingPayroll.net_salary))}</span>
                             </div>
                         </div>
 
-                        <div className="flex gap-2 pt-2 print:hidden">
+                        <div className="flex gap-2 pt-2">
                             <button
                                 type="button"
                                 onClick={() => setPrintingPayroll(null)}
-                                className="rounded-xl border border-gray-300 px-3 py-2.5 text-xs font-bold text-gray-600 hover:bg-gray-100 transition"
+                                className="rounded-xl border border-input px-3 py-2.5 text-xs font-bold text-muted-foreground hover:bg-muted transition"
                             >
                                 Tutup
                             </button>
@@ -1084,13 +1066,14 @@ export default function ShiftAttendance({ activeShift, activeAttendance, myStore
                             >
                                 ✉️ Kirim Email
                             </button>
-                            <button
-                                type="button"
-                                onClick={() => window.print()}
-                                className="flex-1 rounded-xl bg-indigo-600 py-2.5 text-xs font-bold text-white hover:bg-indigo-700 transition"
+                            <a
+                                href={route('shifts.payroll.print', printingPayroll.id)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="flex-1 rounded-xl bg-indigo-600 py-2.5 text-xs font-bold text-white hover:bg-indigo-700 transition text-center flex items-center justify-center gap-1"
                             >
-                                Cetak Slip
-                            </button>
+                                🖨️ Cetak HTML
+                            </a>
                         </div>
                     </div>
                 </div>

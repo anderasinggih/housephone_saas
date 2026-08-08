@@ -63,6 +63,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/shifts/{shift}', [ShiftController::class, 'destroy'])->name('shifts.destroy');
     Route::post('/shifts/payroll', [ShiftController::class, 'storePayroll'])->name('shifts.payroll.store');
     Route::post('/shifts/payroll/{payroll}/send-email', [ShiftController::class, 'sendPayrollEmail'])->name('shifts.payroll.send-email');
+    Route::get('/shifts/payroll/{payroll}/print', [ShiftController::class, 'printPayroll'])->name('shifts.payroll.print');
 
     // User Management
     Route::get('/users', [UserController::class, 'index'])->name('users.index');

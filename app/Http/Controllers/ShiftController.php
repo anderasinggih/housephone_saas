@@ -183,6 +183,17 @@ class ShiftController extends Controller
         }
     }
 
+    public function printPayroll(Request $request, \App\Models\Payroll $payroll)
+    {
+        $user = $request->user();
+        if (!in_array($user->role, ['superadmin', 'viewer']) && $user->id !== $payroll->user_id) {
+            abort(403, 'Anda tidak berhak melihat slip gaji ini.');
+        }
+
+        $payroll->load(['user.store']);
+        return view('emails.payroll_slip_print', ['payroll' => $payroll]);
+    }
+
     public function clockIn(Request $request): RedirectResponse
     {
         $request->validate([
