@@ -84,14 +84,24 @@ class GeneralSettingsController extends Controller
             'grace_period_minutes' => 'nullable|integer|min:0',
         ]);
 
+        $workStart = $request->work_start_time;
+        if ($workStart && strlen($workStart) === 5) {
+            $workStart .= ':00';
+        }
+
+        $workEnd = $request->work_end_time;
+        if ($workEnd && strlen($workEnd) === 5) {
+            $workEnd .= ':00';
+        }
+
         EmployeeSchedule::updateOrCreate(
             [
                 'user_id' => $request->user_id,
                 'store_id' => $request->store_id,
             ],
             [
-                'work_start_time' => $request->work_start_time,
-                'work_end_time' => $request->work_end_time,
+                'work_start_time' => $workStart,
+                'work_end_time' => $workEnd,
                 'grace_period_minutes' => $request->grace_period_minutes,
             ]
         );

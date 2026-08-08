@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm, router } from '@inertiajs/react';
 import { Settings, ShieldAlert, Clock, MapPin, Trash2, Plus, Calendar, Save } from 'lucide-react';
 import { FormEvent } from 'react';
 
@@ -87,7 +87,7 @@ export default function General({ settings, schedules, employees, stores }: Gene
 
     const deleteSchedule = (id: number) => {
         if (confirm('Apakah Anda yakin ingin menghapus jadwal khusus ini?')) {
-            useForm().delete(route('settings.schedule.destroy', id), {
+            router.delete(route('settings.schedule.destroy', id), {
                 onSuccess: () => {
                     alert('Jadwal khusus berhasil dihapus.');
                 }

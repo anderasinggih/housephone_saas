@@ -47,11 +47,14 @@ class ShiftController extends Controller
 
             // Find matching schedule for user
             $sched = $employeeSchedules->firstWhere('user_id', $sh->user_id);
-            $workStartStr = ($sched && $sched->work_start_time) ? $sched->work_start_time : $generalSettings->work_start_time;
+            $workStartStr = ($sched && !empty($sched->work_start_time)) ? $sched->work_start_time : $generalSettings->work_start_time;
+            if (strlen($workStartStr) === 5) {
+                $workStartStr .= ':00';
+            }
             $graceMins = ($sched && !is_null($sched->grace_period_minutes)) ? (int)$sched->grace_period_minutes : (int)($generalSettings->grace_period_minutes ?? 0);
 
             $openedAt = \Carbon\Carbon::parse($sh->opened_at);
-            $workStartDateTime = \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $openedAt->toDateString() . ' ' . $workStartStr);
+            $workStartDateTime = \Carbon\Carbon::parse($openedAt->toDateString() . ' ' . $workStartStr);
 
             $lateMins = 0;
             if ($openedAt->greaterThan($workStartDateTime)) {
@@ -59,10 +62,6 @@ class ShiftController extends Controller
                 if ($diffMins > $graceMins) {
                     $lateMins = $diffMins;
                 }
-            }
-
-            if ($lateMins === 0 && $att && (int)$att->late_minutes > 0) {
-                $lateMins = (int)$att->late_minutes;
             }
 
             $sh->late_minutes = $lateMins;
