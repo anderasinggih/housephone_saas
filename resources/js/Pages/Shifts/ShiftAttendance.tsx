@@ -992,8 +992,26 @@ export default function ShiftAttendance({ activeShift, activeAttendance, myStore
 
             {/* MODAL PRINTER / PREVIEW SLIP GAJI */}
             {printingPayroll && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className="w-full max-w-md rounded-2xl bg-white text-gray-900 p-6 shadow-2xl space-y-6">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 print:p-0 print:static print:bg-white print:backdrop-none">
+                    <style>{`
+                        @media print {
+                            body * {
+                                visibility: hidden;
+                            }
+                            #printable-payroll-slip, #printable-payroll-slip * {
+                                visibility: visible;
+                            }
+                            #printable-payroll-slip {
+                                position: absolute;
+                                left: 0;
+                                top: 0;
+                                width: 100%;
+                                box-shadow: none !important;
+                                border: none !important;
+                            }
+                        }
+                    `}</style>
+                    <div id="printable-payroll-slip" className="w-full max-w-md rounded-2xl bg-white text-gray-900 p-6 shadow-2xl space-y-6 border border-gray-100">
                         <div className="border-b border-gray-200 pb-4 text-center">
                             <h2 className="text-lg font-black uppercase text-indigo-600 tracking-wider">SLIP GAJI KARYAWAN</h2>
                             <p className="text-xs font-bold text-gray-500 mt-0.5">{myStore?.name || 'HOUSEPHONE SAAS'}</p>
@@ -1044,7 +1062,7 @@ export default function ShiftAttendance({ activeShift, activeAttendance, myStore
                             </div>
                         </div>
 
-                        <div className="flex gap-2 pt-2">
+                        <div className="flex gap-2 pt-2 print:hidden">
                             <button
                                 type="button"
                                 onClick={() => setPrintingPayroll(null)}
