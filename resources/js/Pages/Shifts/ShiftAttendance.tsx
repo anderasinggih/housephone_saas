@@ -36,6 +36,7 @@ interface Shift {
     status: 'open' | 'closed';
     opened_at: string;
     closed_at: string | null;
+    late_minutes?: number;
     store?: Store;
     user?: { name: string };
     petty_cash?: Array<{
@@ -73,9 +74,13 @@ interface ShiftAttendanceProps {
     myStore: Store | null;
     shifts: Shift[];
     attendanceStats: AttendanceStat[] | AttendanceStat | null;
+    filters?: {
+        month: number;
+        year: number;
+    };
 }
 
-export default function ShiftAttendance({ activeShift, activeAttendance, myStore, shifts, attendanceStats }: ShiftAttendanceProps) {
+export default function ShiftAttendance({ activeShift, activeAttendance, myStore, shifts, attendanceStats, filters }: ShiftAttendanceProps) {
     const authUser = usePage().props.auth.user as any;
     const isSuperAdmin = authUser.role === 'superadmin';
     const isViewer = authUser.role === 'viewer';
@@ -443,11 +448,54 @@ export default function ShiftAttendance({ activeShift, activeAttendance, myStore
 
                     {/* Rekapitulasi Shift & Absensi */}
                     <div className="rounded-lg border border-border bg-card p-6 shadow-sm text-card-foreground">
-                        <div className="flex items-center gap-2 mb-4">
-                            <Clock className="h-5 w-5 text-indigo-500" />
-                            <h3 className="text-lg font-semibold text-foreground">
-                                {canSeeAllShifts ? 'Rekapitulasi Shift & Absensi Karyawan' : 'Rekapitulasi Absensi Anda'}
-                            </h3>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                            <div className="flex items-center gap-2">
+                                <Clock className="h-5 w-5 text-indigo-500" />
+                                <h3 className="text-lg font-semibold text-foreground">
+                                    {canSeeAllShifts ? 'Ringkasan Absensi & Keterlambatan Karyawan' : 'Rekapitulasi Absensi Anda'}
+                                </h3>
+                            </div>
+
+                            {/* Month & Year Filter for SuperAdmin / Viewer */}
+                            {canSeeAllShifts && (
+                                <div className="flex items-center gap-2">
+                                    <select
+                                        value={filters?.month || (new Date().getMonth() + 1)}
+                                        onChange={(e) => {
+                                            const selectedM = e.target.value;
+                                            const selectedY = filters?.year || new Date().getFullYear();
+                                            router.get(route('shifts.index'), { month: selectedM, year: selectedY }, { preserveState: true });
+                                        }}
+                                        className="rounded-xl border border-input bg-background px-3 py-1.5 text-xs font-bold text-foreground focus:border-indigo-500 focus:outline-none"
+                                    >
+                                        <option value="1">Januari</option>
+                                        <option value="2">Februari</option>
+                                        <option value="3">Maret</option>
+                                        <option value="4">April</option>
+                                        <option value="5">Mei</option>
+                                        <option value="6">Juni</option>
+                                        <option value="7">Juli</option>
+                                        <option value="8">Agustus</option>
+                                        <option value="9">September</option>
+                                        <option value="10">Oktober</option>
+                                        <option value="11">November</option>
+                                        <option value="12">Desember</option>
+                                    </select>
+                                    <select
+                                        value={filters?.year || new Date().getFullYear()}
+                                        onChange={(e) => {
+                                            const selectedY = e.target.value;
+                                            const selectedM = filters?.month || (new Date().getMonth() + 1);
+                                            router.get(route('shifts.index'), { month: selectedM, year: selectedY }, { preserveState: true });
+                                        }}
+                                        className="rounded-xl border border-input bg-background px-3 py-1.5 text-xs font-bold text-foreground focus:border-indigo-500 focus:outline-none"
+                                    >
+                                        {[2024, 2025, 2026, 2027].map((yr) => (
+                                            <option key={yr} value={yr}>{yr}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
                         </div>
 
                         {canSeeAllShifts ? (
@@ -457,14 +505,14 @@ export default function ShiftAttendance({ activeShift, activeAttendance, myStore
                                         <tr className="border-b border-border dark:border-input text-xs font-bold uppercase tracking-wider text-gray-400">
                                             <th className="pb-3 font-semibold">Nama Karyawan</th>
                                             <th className="pb-3 font-semibold text-center">Total Shift (Hari)</th>
-                                            <th className="pb-3 font-semibold text-center">Total Telat</th>
+                                            <th className="pb-3 font-semibold text-center">Total Keterlambatan</th>
                                             <th className="pb-3 font-semibold text-center">Total Jam Kerja</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300">
                                         {!attendanceStats || (Array.isArray(attendanceStats) && attendanceStats.length === 0) ? (
                                             <tr>
-                                                <td colSpan={4} className="py-6 text-center text-gray-400">Belum ada rekap absensi tersedia.</td>
+                                                <td colSpan={4} className="py-6 text-center text-gray-400">Belum ada rekap absensi untuk bulan ini.</td>
                                             </tr>
                                         ) : (
                                             (Array.isArray(attendanceStats) ? attendanceStats : []).map((stat) => {
@@ -472,13 +520,13 @@ export default function ShiftAttendance({ activeShift, activeAttendance, myStore
                                                 const workMins = parseInt(stat.total_work_minutes as string, 10) || 0;
                                                 
                                                 const formatMinutes = (mins: number) => {
-                                                    if (mins <= 0) return 'Tepat Waktu';
+                                                    if (mins <= 0) return '✦ Tepat Waktu';
                                                     const hrs = Math.floor(mins / 60);
                                                     const remainingMins = mins % 60;
                                                     if (hrs > 0) {
-                                                        return `${hrs}j ${remainingMins}m`;
+                                                        return `Telat ${hrs} jam ${remainingMins} menit`;
                                                     }
-                                                    return `${remainingMins}m`;
+                                                    return `Telat ${remainingMins} menit`;
                                                 };
 
                                                 const formatWorkTime = (mins: number) => {
@@ -492,11 +540,11 @@ export default function ShiftAttendance({ activeShift, activeAttendance, myStore
                                                         <td className="py-4 font-semibold text-foreground">{stat.user?.name || 'Unknown'}</td>
                                                         <td className="py-4 text-center font-bold">{stat.total_days} Hari</td>
                                                         <td className="py-4 text-center">
-                                                            <span className={lateMins > 0 ? "text-rose-600 dark:text-rose-400 font-bold" : "text-emerald-600 dark:text-emerald-400"}>
+                                                            <span className={lateMins > 0 ? "inline-flex items-center gap-1 rounded-full bg-rose-500/10 px-2.5 py-1 text-xs font-black text-rose-600 dark:text-rose-400 border border-rose-500/20" : "inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"}>
                                                                 {formatMinutes(lateMins)}
                                                             </span>
                                                         </td>
-                                                        <td className="py-4 text-center text-xs">{formatWorkTime(workMins)}</td>
+                                                        <td className="py-4 text-center text-xs font-bold text-foreground">{formatWorkTime(workMins)}</td>
                                                     </tr>
                                                 );
                                             })
@@ -570,11 +618,25 @@ export default function ShiftAttendance({ activeShift, activeAttendance, myStore
                                         </tr>
                                     ) : (
                                         shifts.map((sh) => {
+                                            const lateMins = sh.late_minutes || 0;
                                             return (
                                                 <tr key={sh.id} className="hover:bg-muted/50 dark:hover:bg-gray-900/50">
                                                     <td className="py-4 font-semibold text-foreground">{sh.user?.name}</td>
                                                     {canSeeAllShifts && <td className="py-4 text-xs">{sh.store?.name || '-'}</td>}
-                                                    <td className="py-4 text-xs">{new Date(sh.opened_at).toLocaleString('id-ID')}</td>
+                                                    <td className="py-4 text-xs">
+                                                        <div>
+                                                            <p className="font-semibold text-foreground">{new Date(sh.opened_at).toLocaleString('id-ID')}</p>
+                                                            {lateMins > 0 ? (
+                                                                <span className="inline-block mt-0.5 rounded bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-bold text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                                                                    Telat {Math.floor(lateMins / 60) > 0 ? `${Math.floor(lateMins / 60)}j ${lateMins % 60}m` : `${lateMins}m`}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="inline-block mt-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                                                                    ✦ Tepat Waktu
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </td>
                                                     <td className="py-4 text-xs">{sh.closed_at ? new Date(sh.closed_at).toLocaleString('id-ID') : '-'}</td>
                                                     {canSeeAllShifts && (
                                                         <>

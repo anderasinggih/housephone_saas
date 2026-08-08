@@ -27,23 +27,39 @@ class ShiftController extends Controller
             ->whereNull('clock_out')
             ->first();
 
-        // Get past shifts
+        $selectedMonth = $request->input('month', date('m'));
+        $selectedYear = $request->input('year', date('Y'));
+
+        // Get past shifts with attendance
         $shifts = Shift::with(['store', 'user', 'pettyCash'])
             ->when(!in_array($user->role, ['superadmin', 'viewer']), fn($q) => $q->where('user_id', $user->id))
             ->orderBy('created_at', 'desc')
             ->get();
 
+        // Attach corresponding attendance to each shift to retrieve exact late_minutes
+        $shifts->transform(function($sh) {
+            $att = Attendance::where('user_id', $sh->user_id)
+                ->whereDate('clock_in', \Carbon\Carbon::parse($sh->opened_at)->toDateString())
+                ->first();
+            $sh->late_minutes = $att ? $att->late_minutes : 0;
+            return $sh;
+        });
+
         // Get active store if assigned
         $myStore = Store::find($user->store_id);
 
-        // Fetch attendance statistics
+        // Fetch attendance statistics per month
         if (in_array($user->role, ['superadmin', 'viewer'])) {
             $attendanceStats = Attendance::with('user')
+                ->whereMonth('clock_in', $selectedMonth)
+                ->whereYear('clock_in', $selectedYear)
                 ->select('user_id', DB::raw('count(id) as total_days'), DB::raw('sum(late_minutes) as total_late_minutes'), DB::raw('sum(work_minutes) as total_work_minutes'))
                 ->groupBy('user_id')
                 ->get();
         } else {
             $attendanceStats = Attendance::where('user_id', $user->id)
+                ->whereMonth('clock_in', $selectedMonth)
+                ->whereYear('clock_in', $selectedYear)
                 ->select(DB::raw('count(id) as total_days'), DB::raw('sum(late_minutes) as total_late_minutes'), DB::raw('sum(work_minutes) as total_work_minutes'))
                 ->first();
         }
@@ -63,6 +79,10 @@ class ShiftController extends Controller
             'employeeSchedules' => $employeeSchedules,
             'stores' => $stores,
             'employees' => $employees,
+            'filters' => [
+                'month' => (int)$selectedMonth,
+                'year' => (int)$selectedYear,
+            ]
         ]);
     }
 
