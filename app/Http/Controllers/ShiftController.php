@@ -36,12 +36,35 @@ class ShiftController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
-        // Attach corresponding attendance to each shift to retrieve exact late_minutes
-        $shifts->transform(function($sh) {
+        $generalSettings = \App\Models\GeneralSetting::first() ?? \App\Models\GeneralSetting::create();
+        $employeeSchedules = \App\Models\EmployeeSchedule::with(['user', 'store'])->get();
+
+        // Attach corresponding attendance or calculate late minutes for each shift
+        $shifts->transform(function($sh) use ($employeeSchedules, $generalSettings) {
             $att = Attendance::where('user_id', $sh->user_id)
                 ->whereDate('clock_in', \Carbon\Carbon::parse($sh->opened_at)->toDateString())
                 ->first();
-            $sh->late_minutes = $att ? $att->late_minutes : 0;
+
+            if ($att && !is_null($att->late_minutes)) {
+                $sh->late_minutes = (int)$att->late_minutes;
+            } else {
+                // Compute dynamically if attendance record was created before schedule settings
+                $sched = $employeeSchedules->firstWhere('user_id', $sh->user_id);
+                $workStartStr = ($sched && $sched->work_start_time) ? $sched->work_start_time : $generalSettings->work_start_time;
+                $graceMins = ($sched && !is_null($sched->grace_period_minutes)) ? (int)$sched->grace_period_minutes : (int)$generalSettings->grace_period_minutes;
+
+                $openedAt = \Carbon\Carbon::parse($sh->opened_at);
+                $workStartDateTime = \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $openedAt->toDateString() . ' ' . $workStartStr);
+
+                $lateMins = 0;
+                if ($openedAt->greaterThan($workStartDateTime)) {
+                    $diffMins = $openedAt->diffInMinutes($workStartDateTime);
+                    if ($diffMins > $graceMins) {
+                        $lateMins = $diffMins;
+                    }
+                }
+                $sh->late_minutes = $lateMins;
+            }
             return $sh;
         });
 
